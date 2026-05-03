@@ -13,6 +13,6 @@ spring.jpa.properties.hibernate.format_sql=true
 
 server.port=8080
 
-# Google Maps API Key
-# 需在 Google Cloud Console 開啟：Geocoding API、Directions API
-google.maps.api-key=YOUR_GOOGLE_MAPS_API_KEY
+# OpenRouteService API Key
+# 免費申請：https://openrouteservice.org
+ors.api-key=YOUR_ORS_API_KEY

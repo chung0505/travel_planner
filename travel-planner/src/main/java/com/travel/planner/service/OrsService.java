@@ -17,51 +17,49 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.StringJoiner;
+import java.util.Map;
 
 @Service
 public class OrsService {
 
     private static final Logger log = LoggerFactory.getLogger(OrsService.class);
-    private static final String GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json";
-    private static final String DIRECTIONS_URL = "https://maps.googleapis.com/maps/api/directions/json";
+    private static final String BASE_URL = "https://api.openrouteservice.org";
 
     private final String apiKey;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
-    public OrsService(@Value("${google.maps.api-key}") String apiKey, ObjectMapper objectMapper) {
+    public OrsService(@Value("${ors.api-key}") String apiKey, ObjectMapper objectMapper) {
         this.apiKey = apiKey;
         this.httpClient = HttpClient.newHttpClient();
         this.objectMapper = objectMapper;
     }
 
     /**
-     * 地址 → 經緯度，使用 Google Geocoding API
+     * 地址 → 經緯度，使用 Nominatim（OpenStreetMap），免費不需 API Key
      * 回傳 [latitude, longitude]，失敗時回傳 null
      */
     public double[] geocode(String address) {
         try {
             String encoded = URLEncoder.encode(address, StandardCharsets.UTF_8);
-            String url = GEOCODE_URL + "?address=" + encoded + "&key=" + apiKey;
+            String url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encoded;
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
+                    .header("User-Agent", "TravelPlannerApp/1.0")
                     .GET()
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             JsonNode root = objectMapper.readTree(response.body());
 
-            String status = root.path("status").asText();
-            if (!"OK".equals(status)) {
-                log.warn("Geocoding 找不到地址: {} (status={})", address, status);
+            if (!root.isArray() || root.isEmpty()) {
+                log.warn("Geocoding 找不到地址: {}", address);
                 return null;
             }
 
-            JsonNode location = root.path("results").get(0).path("geometry").path("location");
-            double lat = location.path("lat").asDouble();
-            double lng = location.path("lng").asDouble();
+            double lat = root.get(0).path("lat").asDouble();
+            double lng = root.get(0).path("lon").asDouble();
             return new double[]{lat, lng};
 
         } catch (Exception e) {
@@ -71,88 +69,50 @@ public class OrsService {
     }
 
     /**
-     * 多點路線計算，使用 Google Directions API
+     * 多點路線計算（Directions），使用 ORS API
      * latLngPoints: [[lat, lng], [lat, lng], ...]
      */
     public OrsRouteResult getDirections(List<double[]> latLngPoints, TransportationMethod method) {
-        if (method == TransportationMethod.PUBLIC_TRANSIT) {
-            // Google Directions API 大眾運輸模式不支援 waypoints，逐段呼叫再合併
-            return getTransitDirections(latLngPoints);
-        }
-        return getDrivingOrWalkingDirections(latLngPoints, method);
-    }
-
-    private OrsRouteResult getDrivingOrWalkingDirections(List<double[]> points, TransportationMethod method) {
-        String origin = toLatLng(points.get(0));
-        String destination = toLatLng(points.get(points.size() - 1));
-        String mode = toMode(method);
-
-        StringBuilder url = new StringBuilder(DIRECTIONS_URL)
-                .append("?origin=").append(origin)
-                .append("&destination=").append(destination)
-                .append("&mode=").append(mode)
-                .append("&key=").append(apiKey);
-
-        if (points.size() > 2) {
-            StringJoiner waypoints = new StringJoiner("|");
-            for (int i = 1; i < points.size() - 1; i++) {
-                waypoints.add(toLatLng(points.get(i)));
-            }
-            url.append("&waypoints=").append(waypoints);
-        }
-
-        return callDirectionsApi(url.toString());
-    }
-
-    private OrsRouteResult getTransitDirections(List<double[]> points) {
-        double totalDistance = 0;
-        double totalDuration = 0;
-        List<double[]> geometry = new ArrayList<>();
-
-        for (int i = 0; i < points.size() - 1; i++) {
-            String url = DIRECTIONS_URL
-                    + "?origin=" + toLatLng(points.get(i))
-                    + "&destination=" + toLatLng(points.get(i + 1))
-                    + "&mode=transit"
-                    + "&key=" + apiKey;
-
-            OrsRouteResult segment = callDirectionsApi(url);
-            totalDistance += segment.distanceMeters();
-            totalDuration += segment.durationSeconds();
-            geometry.addAll(segment.geometry());
-        }
-
-        return new OrsRouteResult(totalDistance, totalDuration, geometry);
-    }
-
-    private OrsRouteResult callDirectionsApi(String url) {
         try {
+            String profile = toProfile(method);
+            String url = BASE_URL + "/v2/directions/" + profile + "/geojson";
+
+            // ORS 要求 [longitude, latitude] 順序
+            List<double[]> orsCoords = latLngPoints.stream()
+                    .map(p -> new double[]{p[1], p[0]})
+                    .toList();
+
+            String body = objectMapper.writeValueAsString(Map.of("coordinates", orsCoords));
+
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .GET()
+                    .header("Authorization", apiKey)
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json, application/geo+json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                throw new InvalidInputException("ORS 路線計算失敗（HTTP " + response.statusCode() + "），請確認 API Key 是否正確");
+            }
+
             JsonNode root = objectMapper.readTree(response.body());
+            JsonNode feature = root.path("features").get(0);
+            JsonNode summary = feature.path("properties").path("summary");
+            JsonNode geomCoords = feature.path("geometry").path("coordinates");
 
-            String status = root.path("status").asText();
-            if (!"OK".equals(status)) {
-                throw new InvalidInputException("路線計算失敗（" + status + "），請確認景點地址是否正確");
+            double distanceMeters = summary.path("distance").asDouble();
+            double durationSeconds = summary.path("duration").asDouble();
+
+            // 轉換回 [latitude, longitude] 供 Leaflet 使用
+            List<double[]> geometry = new ArrayList<>();
+            for (JsonNode coord : geomCoords) {
+                geometry.add(new double[]{coord.get(1).asDouble(), coord.get(0).asDouble()});
             }
 
-            JsonNode route = root.path("routes").get(0);
-
-            double totalDistance = 0;
-            double totalDuration = 0;
-            for (JsonNode leg : route.path("legs")) {
-                totalDistance += leg.path("distance").path("value").asDouble();
-                totalDuration += leg.path("duration").path("value").asDouble();
-            }
-
-            String encodedPolyline = route.path("overview_polyline").path("points").asText();
-            List<double[]> geometry = decodePolyline(encodedPolyline);
-
-            return new OrsRouteResult(totalDistance, totalDuration, geometry);
+            return new OrsRouteResult(distanceMeters, durationSeconds, geometry);
 
         } catch (InvalidInputException e) {
             throw e;
@@ -161,46 +121,10 @@ public class OrsService {
         }
     }
 
-    /**
-     * 解碼 Google Encoded Polyline Algorithm Format
-     */
-    private List<double[]> decodePolyline(String encoded) {
-        List<double[]> result = new ArrayList<>();
-        int index = 0, len = encoded.length();
-        int lat = 0, lng = 0;
-
-        while (index < len) {
-            int b, shift = 0, val = 0;
-            do {
-                b = encoded.charAt(index++) - 63;
-                val |= (b & 0x1f) << shift;
-                shift += 5;
-            } while (b >= 0x20);
-            lat += (val & 1) != 0 ? ~(val >> 1) : (val >> 1);
-
-            shift = 0;
-            val = 0;
-            do {
-                b = encoded.charAt(index++) - 63;
-                val |= (b & 0x1f) << shift;
-                shift += 5;
-            } while (b >= 0x20);
-            lng += (val & 1) != 0 ? ~(val >> 1) : (val >> 1);
-
-            result.add(new double[]{lat / 1e5, lng / 1e5});
-        }
-        return result;
-    }
-
-    private String toLatLng(double[] point) {
-        return point[0] + "," + point[1];
-    }
-
-    private String toMode(TransportationMethod method) {
+    private String toProfile(TransportationMethod method) {
         return switch (method) {
-            case WALKING -> "walking";
-            case PUBLIC_TRANSIT -> "transit";
-            case TAXI, SELF_DRIVING -> "driving";
+            case WALKING -> "foot-walking";
+            case PUBLIC_TRANSIT, TAXI, SELF_DRIVING -> "driving-car";
         };
     }
 }
