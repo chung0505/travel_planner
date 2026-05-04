@@ -12,6 +12,7 @@ interface Props {
 
 export default function CreateTripModal({ onClose, onCreated }: Props) {
   const [form, setForm] = useState({
+    title: '',
     destination: '',
     departureDate: '',
     returnDate: '',
@@ -27,7 +28,7 @@ export default function CreateTripModal({ onClose, onCreated }: Props) {
     e.preventDefault()
     setError('')
 
-    if (!form.destination || !form.departureDate || !form.returnDate) {
+    if (!form.title || !form.destination || !form.departureDate || !form.returnDate) {
       setError('請填寫所有必填欄位')
       return
     }
@@ -53,6 +54,13 @@ export default function CreateTripModal({ onClose, onCreated }: Props) {
   return (
     <Modal title="建立新行程" onClose={onClose}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <FormField
+          label="行程名稱"
+          required
+          placeholder="例：東京五天四夜、首爾春季之旅"
+          value={form.title}
+          onChange={e => set('title', e.target.value)}
+        />
         <FormField
           label="目的地"
           required

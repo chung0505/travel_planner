@@ -9,13 +9,12 @@ interface Props {
   dailyPlans: DailyPlanResponse[]
 }
 
-const TRANSPORT_METHODS: TransportationMethod[] = ['WALKING', 'PUBLIC_TRANSIT', 'TAXI', 'SELF_DRIVING']
+const TRANSPORT_METHODS: TransportationMethod[] = ['WALKING', 'PUBLIC_TRANSIT', 'TAXI']
 
 const TRANSPORT_ICON: Record<TransportationMethod, string> = {
   WALKING: '🚶',
   PUBLIC_TRANSIT: '🚌',
   TAXI: '🚕',
-  SELF_DRIVING: '🚗',
 }
 
 function allAttractions(dailyPlans: DailyPlanResponse[]): (AttractionResponse & { date: string })[] {
@@ -114,12 +113,12 @@ export default function RoutePlanner({ tripId, dailyPlans }: Props) {
       {/* Step 2 - Choose transport */}
       <div className="bg-white rounded-2xl border border-gray-200 p-4">
         <p className="text-sm font-semibold text-gray-700 mb-3">② 選擇交通方式</p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-3 gap-2">
           {TRANSPORT_METHODS.map(m => (
             <button
               key={m}
               onClick={() => setMethod(m)}
-              className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-sm transition-all
+              className={`flex flex-col items-center gap-1 py-3 rounded-xl border text-sm transition-all
                 ${method === m
                   ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
                   : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
@@ -148,17 +147,52 @@ export default function RoutePlanner({ tripId, dailyPlans }: Props) {
             <MapView
               geometry={estimate.geometry}
               attractions={attractions.filter(a => selected.includes(a.id))}
+              transportationMethod={method}
             />
           )}
 
           <div className="space-y-2">
             {estimate.segments.map((seg, idx) => (
-              <div key={idx} className="flex items-center gap-2 text-sm">
-                <span className="text-gray-700 font-medium">{seg.fromAttraction}</span>
-                <span className="text-gray-300 flex-1 border-t border-dashed border-gray-200 mx-1" />
-                <span className="text-xs text-gray-500">{fmtMinutes(seg.estimatedMinutes)}</span>
-                <span className="text-xs text-gray-400">NT${seg.estimatedCost}</span>
-                <span className="text-gray-700 font-medium">{seg.toAttraction}</span>
+              <div key={idx} className="rounded-lg border border-gray-100 overflow-hidden text-sm">
+                {/* 景點間摘要 */}
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <span className="text-gray-700 font-medium truncate">{seg.fromAttraction}</span>
+                  <span className="text-gray-200 border-t border-dashed border-gray-200 flex-1 mx-1" />
+                  <span className="text-xs text-gray-500 shrink-0">{fmtMinutes(seg.estimatedMinutes)}</span>
+                  {Number(seg.estimatedCost) > 0 && (
+                    <span className="text-xs text-gray-400 shrink-0">NT${seg.estimatedCost}</span>
+                  )}
+                  <span className="text-gray-700 font-medium truncate">{seg.toAttraction}</span>
+                </div>
+                {/* Transit 步驟 */}
+                {seg.transitSteps && seg.transitSteps.length > 0 && (
+                  <div className="border-t border-gray-50 px-3 py-2 space-y-1 bg-blue-50/40">
+                    {seg.transitSteps.map((step, si) => (
+                      <div key={si} className="flex items-center gap-2 text-xs">
+                        {step.travelMode === 'TRANSIT' ? (
+                          <>
+                            <span className="text-blue-600 font-medium shrink-0">
+                              {step.vehicleName === '捷運' ? '🚇' : '🚌'} {step.vehicleName}
+                              {step.lineName ? ` ${step.lineName}` : ''}
+                            </span>
+                            <span className="text-gray-400 shrink-0">
+                              {step.departureStop} → {step.arrivalStop}
+                            </span>
+                            {step.numStops != null && step.numStops > 0 && (
+                              <span className="text-gray-300 shrink-0">{step.numStops} 站</span>
+                            )}
+                            <span className="text-gray-400 ml-auto shrink-0">{fmtMinutes(step.durationMinutes)}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-gray-400 shrink-0">🚶 步行</span>
+                            <span className="text-gray-400 ml-auto shrink-0">{fmtMinutes(step.durationMinutes)}</span>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -194,6 +228,7 @@ export default function RoutePlanner({ tripId, dailyPlans }: Props) {
                 <MapView
                   geometry={r.geometry}
                   attractions={attractions.filter(a => r.attractionIds.includes(a.id))}
+                  transportationMethod={r.transportationMethod}
                 />
               )}
             </div>

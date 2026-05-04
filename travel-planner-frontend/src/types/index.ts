@@ -1,10 +1,9 @@
-export type TransportationMethod = 'WALKING' | 'PUBLIC_TRANSIT' | 'TAXI' | 'SELF_DRIVING'
+export type TransportationMethod = 'WALKING' | 'PUBLIC_TRANSIT' | 'TAXI'
 
 export const TRANSPORTATION_LABELS: Record<TransportationMethod, string> = {
   WALKING: '步行',
   PUBLIC_TRANSIT: '大眾運輸',
   TAXI: '計程車',
-  SELF_DRIVING: '自駕',
 }
 
 export interface AttractionResponse {
@@ -26,6 +25,7 @@ export interface DailyPlanResponse {
 
 export interface TripResponse {
   id: number
+  title: string
   destination: string
   departureDate: string
   returnDate: string
@@ -34,11 +34,22 @@ export interface TripResponse {
   dailyPlans: DailyPlanResponse[]
 }
 
+export interface TransitStepInfo {
+  travelMode: 'TRANSIT' | 'WALKING'
+  vehicleName: string        // 捷運 / 公車 / 步行
+  lineName: string | null    // 板南線 / 297路
+  departureStop: string | null
+  arrivalStop: string | null
+  numStops: number | null
+  durationMinutes: number
+}
+
 export interface RouteSegmentResponse {
   fromAttraction: string
   toAttraction: string
   estimatedMinutes: number
   estimatedCost: number
+  transitSteps: TransitStepInfo[] | null
 }
 
 export interface RouteEstimateResponse {
@@ -69,6 +80,7 @@ export interface ApiResponse<T> {
 
 // Request types
 export interface CreateTripRequest {
+  title: string
   destination: string
   departureDate: string
   returnDate: string

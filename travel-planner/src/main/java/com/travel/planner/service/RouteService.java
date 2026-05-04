@@ -56,12 +56,16 @@ public class RouteService {
         List<double[]> coordinates = extractCoordinates(attractions);
         TransportationMethod method = request.getTransportationMethod();
 
-        OrsRouteResult orsResult = orsService.getDirections(coordinates, method);
+        List<String> addresses = attractions.stream().map(Attraction::getAddress).toList();
+        OrsRouteResult orsResult = orsService.getDirections(coordinates, addresses, method);
 
         List<RouteSegmentResponse> segments = buildSegments(attractions, orsResult, method);
 
         int totalMinutes = (int) Math.round(orsResult.durationSeconds() / 60.0);
-        BigDecimal totalCost = calculateCost(method, orsResult.distanceMeters());
+        // 總費用從各段加總，確保使用 API 回傳的實際票價（transit）
+        BigDecimal totalCost = segments.stream()
+                .map(RouteSegmentResponse::getEstimatedCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return new RouteEstimateResponse(
                 request.getAttractionIds(),
@@ -80,10 +84,14 @@ public class RouteService {
         List<double[]> coordinates = extractCoordinates(attractions);
         TransportationMethod method = request.getTransportationMethod();
 
-        OrsRouteResult orsResult = orsService.getDirections(coordinates, method);
+        List<String> addresses = attractions.stream().map(Attraction::getAddress).toList();
+        OrsRouteResult orsResult = orsService.getDirections(coordinates, addresses, method);
 
         int totalMinutes = (int) Math.round(orsResult.durationSeconds() / 60.0);
-        BigDecimal totalCost = calculateCost(method, orsResult.distanceMeters());
+        List<RouteSegmentResponse> confirmSegments = buildSegments(attractions, orsResult, method);
+        BigDecimal totalCost = confirmSegments.stream()
+                .map(RouteSegmentResponse::getEstimatedCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Route route = new Route(trip, request.getAttractionIds(), method, totalMinutes, totalCost);
         route.setConfirmed(true);
@@ -150,19 +158,36 @@ public class RouteService {
         int segmentCount = attractions.size() - 1;
         if (segmentCount <= 0) return segments;
 
-        // 將總時間和費用平均分配給每段（ORS 只回傳整體結果）
-        int minutesPerSegment = (int) Math.round(orsResult.durationSeconds() / 60.0 / segmentCount);
-        BigDecimal totalCost = calculateCost(method, orsResult.distanceMeters());
-        BigDecimal costPerSegment = segmentCount > 0
-                ? totalCost.divide(BigDecimal.valueOf(segmentCount), 0, RoundingMode.CEILING)
-                : BigDecimal.ZERO;
+        List<double[]> legData = orsResult.legData();
 
         for (int i = 0; i < segmentCount; i++) {
+            int minutes;
+            BigDecimal cost;
+            if (legData != null && !legData.isEmpty() && i < legData.size()) {
+                minutes = (int) Math.round(legData.get(i)[1] / 60.0);
+                // 優先使用 Google API 回傳的實際票價（transit 才有），否則自行估算
+                List<Double> legFares = orsResult.legFares();
+                if (legFares != null && i < legFares.size() && legFares.get(i) != null) {
+                    cost = BigDecimal.valueOf(Math.round(legFares.get(i)));
+                } else {
+                    cost = calculateCost(method, legData.get(i)[0]);
+                }
+            } else {
+                minutes = (int) Math.round(orsResult.durationSeconds() / 60.0 / segmentCount);
+                cost = calculateCost(method, orsResult.distanceMeters())
+                        .divide(BigDecimal.valueOf(segmentCount), 0, RoundingMode.CEILING);
+            }
+            // transit steps（捷運/公車換乘步驟）
+            List<com.travel.planner.dto.response.TransitStepInfo> steps = null;
+            if (orsResult.segmentSteps() != null && i < orsResult.segmentSteps().size()) {
+                steps = orsResult.segmentSteps().get(i);
+            }
             segments.add(new RouteSegmentResponse(
                     attractions.get(i).getName(),
                     attractions.get(i + 1).getName(),
-                    minutesPerSegment,
-                    costPerSegment
+                    minutes,
+                    cost,
+                    steps
             ));
         }
         return segments;
@@ -175,9 +200,8 @@ public class RouteService {
         double km = distanceMeters / 1000.0;
         double fare = switch (method) {
             case WALKING -> 0;
-            case PUBLIC_TRANSIT -> 30; // 固定票價估算（ORS 不支援大眾運輸路線）
+            case PUBLIC_TRANSIT -> 30; // 固定票價估算（依距離計算較複雜，以固定值代替）
             case TAXI -> 85 + Math.max(0, (km - 1.25) / 0.2 * 5); // 起跳 85 元，每 200m +5 元
-            case SELF_DRIVING -> (km / 12.0) * 30; // 油耗 12km/L，油價 30元/L
         };
         return BigDecimal.valueOf(Math.round(fare));
     }

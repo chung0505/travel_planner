@@ -31,6 +31,7 @@ public class TripService {
         validateTripDates(request.getDepartureDate(), request.getReturnDate());
 
         Trip trip = new Trip(
+                request.getTitle(),
                 request.getDestination(),
                 request.getDepartureDate(),
                 request.getReturnDate(),

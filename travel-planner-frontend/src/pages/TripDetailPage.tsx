@@ -56,8 +56,9 @@ export default function TripDetailPage() {
           </button>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">✈️ {trip.destination}</h1>
-              <p className="text-sm text-gray-500 mt-1">
+              <h1 className="text-2xl font-bold text-gray-800">{trip.title}</h1>
+              <p className="text-sm text-gray-500 mt-0.5">✈️ {trip.destination}</p>
+              <p className="text-sm text-gray-400 mt-1">
                 {trip.departureDate} → {trip.returnDate}
                 <span className="mx-2 text-gray-300">|</span>
                 {trip.totalDays} 天

@@ -15,6 +15,9 @@ public class Trip {
     private Long id;
 
     @Column(nullable = false)
+    private String title;
+
+    @Column(nullable = false)
     private String destination;
 
     @Column(nullable = false)
@@ -35,7 +38,8 @@ public class Trip {
 
     protected Trip() {}
 
-    public Trip(String destination, LocalDate departureDate, LocalDate returnDate, int companionCount) {
+    public Trip(String title, String destination, LocalDate departureDate, LocalDate returnDate, int companionCount) {
+        this.title = title;
         this.destination = destination;
         this.departureDate = departureDate;
         this.returnDate = returnDate;
@@ -43,6 +47,7 @@ public class Trip {
     }
 
     public Long getId() { return id; }
+    public String getTitle() { return title; }
     public String getDestination() { return destination; }
     public LocalDate getDepartureDate() { return departureDate; }
     public LocalDate getReturnDate() { return returnDate; }
@@ -50,6 +55,7 @@ public class Trip {
     public List<DailyPlan> getDailyPlans() { return dailyPlans; }
     public List<Route> getRoutes() { return routes; }
 
+    public void setTitle(String title) { this.title = title; }
     public void setDestination(String destination) { this.destination = destination; }
     public void setDepartureDate(LocalDate departureDate) { this.departureDate = departureDate; }
     public void setReturnDate(LocalDate returnDate) { this.returnDate = returnDate; }

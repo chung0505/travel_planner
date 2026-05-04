@@ -117,18 +117,17 @@ class RouteTest {
 
         @Test
         @DisplayName("TransportationMethod 共有四種")
-        void hasFourMethods() {
-            assertThat(TransportationMethod.values()).hasSize(4);
+        void hasThreeMethods() {
+            assertThat(TransportationMethod.values()).hasSize(3);
         }
 
         @Test
-        @DisplayName("包含 WALKING、PUBLIC_TRANSIT、TAXI、SELF_DRIVING")
+        @DisplayName("包含 WALKING、PUBLIC_TRANSIT、TAXI")
         void containsExpectedMethods() {
             assertThat(TransportationMethod.values()).containsExactlyInAnyOrder(
                     TransportationMethod.WALKING,
                     TransportationMethod.PUBLIC_TRANSIT,
-                    TransportationMethod.TAXI,
-                    TransportationMethod.SELF_DRIVING
+                    TransportationMethod.TAXI
             );
         }
     }

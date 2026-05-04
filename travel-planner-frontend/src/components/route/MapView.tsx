@@ -1,63 +1,89 @@
-import { useEffect } from 'react'
-import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet'
-import L from 'leaflet'
-import type { AttractionResponse } from '../../types'
-
-// Fix Leaflet default marker icons broken by bundlers
-delete (L.Icon.Default.prototype as any)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-})
+import { useState, useCallback, useRef } from 'react'
+import { GoogleMap, Marker, Polyline, InfoWindow, useJsApiLoader } from '@react-google-maps/api'
+import type { AttractionResponse, TransportationMethod } from '../../types'
 
 interface MapViewProps {
   geometry: [number, number][]
   attractions: AttractionResponse[]
+  transportationMethod?: TransportationMethod
 }
 
-function FitBounds({ geometry }: { geometry: [number, number][] }) {
-  const map = useMap()
-  useEffect(() => {
-    if (geometry.length > 0) {
-      map.fitBounds(geometry, { padding: [40, 40] })
-    }
-  }, [map, geometry])
-  return null
+const POLYLINE_STYLE: Record<TransportationMethod, google.maps.PolylineOptions> = {
+  WALKING:        { strokeColor: '#22c55e', strokeWeight: 3, strokeOpacity: 0,
+                    icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 }, offset: '0', repeat: '12px' }] },
+  PUBLIC_TRANSIT: { strokeColor: '#3b82f6', strokeWeight: 5, strokeOpacity: 0.9 },
+  TAXI:           { strokeColor: '#f97316', strokeWeight: 4, strokeOpacity: 0.85 },
 }
 
-export default function MapView({ geometry, attractions }: MapViewProps) {
-  const center: [number, number] = geometry.length > 0
-    ? geometry[Math.floor(geometry.length / 2)]
-    : [25.0330, 121.5654]  // Taipei default
+const containerStyle = {
+  height: '400px',
+  width: '100%',
+  borderRadius: '0.5rem',
+}
 
+export default function MapView({ geometry, attractions, transportationMethod }: MapViewProps) {
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '',
+  })
+
+  const mapRef = useRef<google.maps.Map | null>(null)
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
+
+  const center = geometry.length > 0
+    ? { lat: geometry[Math.floor(geometry.length / 2)][0], lng: geometry[Math.floor(geometry.length / 2)][1] }
+    : { lat: 25.0330, lng: 121.5654 }
+
+  const path = geometry.map(([lat, lng]) => ({ lat, lng }))
   const markers = attractions.filter(a => a.latitude != null && a.longitude != null)
 
+  const onLoad = useCallback((map: google.maps.Map) => {
+    mapRef.current = map
+    if (geometry.length > 0) {
+      const bounds = new google.maps.LatLngBounds()
+      geometry.forEach(([lat, lng]) => bounds.extend({ lat, lng }))
+      map.fitBounds(bounds, 40)
+    }
+  }, [geometry])
+
+  if (!isLoaded) {
+    return (
+      <div style={containerStyle} className="bg-gray-100 flex items-center justify-center rounded-lg">
+        <span className="text-gray-500 text-sm">地圖載入中...</span>
+      </div>
+    )
+  }
+
   return (
-    <MapContainer
+    <GoogleMap
+      mapContainerStyle={containerStyle}
       center={center}
       zoom={13}
-      style={{ height: '400px', width: '100%', borderRadius: '0.5rem' }}
+      onLoad={onLoad}
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-
-      {geometry.length > 1 && (
-        <Polyline positions={geometry} color="#3b82f6" weight={4} opacity={0.8} />
+      {path.length > 1 && (
+        <Polyline
+          path={path}
+          options={transportationMethod ? POLYLINE_STYLE[transportationMethod] : { strokeColor: '#3b82f6', strokeWeight: 4, strokeOpacity: 0.8 }}
+        />
       )}
 
       {markers.map((a, idx) => (
-        <Marker key={a.id} position={[a.latitude!, a.longitude!]}>
-          <Popup>
-            <div className="text-sm font-medium">{idx + 1}. {a.name}</div>
-            <div className="text-xs text-gray-500">{a.startTime} – {a.endTime}</div>
-          </Popup>
+        <Marker
+          key={a.id}
+          position={{ lat: a.latitude!, lng: a.longitude! }}
+          label={{ text: String(idx + 1), color: 'white', fontWeight: 'bold' }}
+          onClick={() => setSelectedIdx(idx)}
+        >
+          {selectedIdx === idx && (
+            <InfoWindow onCloseClick={() => setSelectedIdx(null)}>
+              <div>
+                <div className="text-sm font-medium">{idx + 1}. {a.name}</div>
+                <div className="text-xs text-gray-500">{a.startTime} – {a.endTime}</div>
+              </div>
+            </InfoWindow>
+          )}
         </Marker>
       ))}
-
-      {geometry.length > 0 && <FitBounds geometry={geometry} />}
-    </MapContainer>
+    </GoogleMap>
   )
 }

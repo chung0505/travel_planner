@@ -16,8 +16,9 @@ export default function TripCard({ trip }: Props) {
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-lg font-bold text-gray-800">✈️ {trip.destination}</h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <h3 className="text-lg font-bold text-gray-800">{trip.title}</h3>
+          <p className="text-sm text-gray-500 mt-0.5">✈️ {trip.destination}</p>
+          <p className="text-sm text-gray-400 mt-0.5">
             {trip.departureDate} → {trip.returnDate}
           </p>
         </div>

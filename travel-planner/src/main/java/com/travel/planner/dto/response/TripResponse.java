@@ -8,6 +8,7 @@ import java.util.List;
 public class TripResponse {
 
     private final Long id;
+    private final String title;
     private final String destination;
     private final LocalDate departureDate;
     private final LocalDate returnDate;
@@ -17,6 +18,7 @@ public class TripResponse {
 
     public TripResponse(Trip trip) {
         this.id = trip.getId();
+        this.title = trip.getTitle();
         this.destination = trip.getDestination();
         this.departureDate = trip.getDepartureDate();
         this.returnDate = trip.getReturnDate();
@@ -28,6 +30,7 @@ public class TripResponse {
     }
 
     public Long getId() { return id; }
+    public String getTitle() { return title; }
     public String getDestination() { return destination; }
     public LocalDate getDepartureDate() { return departureDate; }
     public LocalDate getReturnDate() { return returnDate; }
