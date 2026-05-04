@@ -21,7 +21,7 @@ class TripTest {
 
     @BeforeEach
     void setUp() {
-        trip = new Trip(DESTINATION, DEPARTURE, RETURN, COMPANION_COUNT);
+        trip = new Trip("東京之旅", DESTINATION, DEPARTURE, RETURN, COMPANION_COUNT);
     }
 
     @Nested

@@ -22,7 +22,7 @@ class RouteTest {
 
     @BeforeEach
     void setUp() {
-        trip = new Trip("東京", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 3), 2);
+        trip = new Trip("東京之旅", "東京", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 3), 2);
         attractionIds = List.of(1L, 2L, 3L);
     }
 

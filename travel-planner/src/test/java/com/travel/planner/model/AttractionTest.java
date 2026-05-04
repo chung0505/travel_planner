@@ -23,7 +23,7 @@ class AttractionTest {
 
     @BeforeEach
     void setUp() {
-        Trip trip = new Trip("東京", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 3), 2);
+        Trip trip = new Trip("東京之旅", "東京", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 3), 2);
         dailyPlan = new DailyPlan(trip, LocalDate.of(2026, 7, 1), 1);
         attraction = new Attraction(dailyPlan, NAME, ADDRESS, START, END);
     }

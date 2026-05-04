@@ -21,7 +21,7 @@ class DailyPlanTest {
 
     @BeforeEach
     void setUp() {
-        trip = new Trip("東京", DATE, DATE.plusDays(2), 2);
+        trip = new Trip("東京之旅", "東京", DATE, DATE.plusDays(2), 2);
         dailyPlan = new DailyPlan(trip, DATE, DAY_NUMBER);
     }
 
