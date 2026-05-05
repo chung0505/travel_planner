@@ -45,7 +45,11 @@ export default function HomePage() {
           <div className="space-y-3">
             <p className="text-sm text-gray-500">共 {trips.length} 個行程</p>
             {trips.map(trip => (
-              <TripCard key={trip.id} trip={trip} />
+              <TripCard
+                key={trip.id}
+                trip={trip}
+                onDeleted={id => setTrips(prev => prev.filter(t => t.id !== id))}
+              />
             ))}
           </div>
         )}

@@ -11,9 +11,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * UC-01: Create Trip
- */
 @RestController
 @RequestMapping("/api/trips")
 public class TripController {
@@ -24,7 +21,6 @@ public class TripController {
         this.tripService = tripService;
     }
 
-    /** UC-01: 建立新行程，並自動產生逐日行程架構 */
     @PostMapping
     public ResponseEntity<ApiResponse<TripResponse>> createTrip(@Valid @RequestBody CreateTripRequest request) {
         TripResponse response = tripService.createTrip(request);
@@ -42,5 +38,11 @@ public class TripController {
     public ResponseEntity<ApiResponse<List<TripResponse>>> getAllTrips() {
         List<TripResponse> responses = tripService.getAllTrips();
         return ResponseEntity.ok(ApiResponse.success(responses));
+    }
+
+    @DeleteMapping("/{tripId}")
+    public ResponseEntity<ApiResponse<Void>> deleteTrip(@PathVariable Long tripId) {
+        tripService.deleteTrip(tripId);
+        return ResponseEntity.ok(ApiResponse.success("行程已刪除", null));
     }
 }

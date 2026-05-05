@@ -1,17 +1,33 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { tripsApi } from '../../api/trips'
 import type { TripResponse } from '../../types'
 
 interface Props {
   trip: TripResponse
+  onDeleted: (id: number) => void
 }
 
-export default function TripCard({ trip }: Props) {
+export default function TripCard({ trip, onDeleted }: Props) {
   const navigate = useNavigate()
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!window.confirm(`確定要刪除「${trip.title}」？此操作將一併刪除所有每日行程與景點，且無法復原。`)) return
+    setDeleting(true)
+    try {
+      await tripsApi.delete(trip.id)
+      onDeleted(trip.id)
+    } catch {
+      setDeleting(false)
+    }
+  }
 
   return (
     <div
       onClick={() => navigate(`/trips/${trip.id}`)}
-      className="bg-white rounded-2xl border border-gray-200 p-5 cursor-pointer
+      className="group bg-white rounded-2xl border border-gray-200 p-5 cursor-pointer
         hover:shadow-md hover:border-blue-300 transition-all"
     >
       <div className="flex items-start justify-between gap-4">
@@ -30,11 +46,21 @@ export default function TripCard({ trip }: Props) {
         </div>
       </div>
 
-      <div className="mt-3 pt-3 border-t border-gray-100 flex gap-3 text-xs text-gray-400">
-        <span>📅 {trip.totalDays} 個每日行程</span>
-        <span>
-          🗺️ {trip.dailyPlans.reduce((sum, d) => sum + d.attractions.length, 0)} 個景點
-        </span>
+      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+        <div className="flex gap-3 text-xs text-gray-400">
+          <span>📅 {trip.totalDays} 個每日行程</span>
+          <span>
+            🗺️ {trip.dailyPlans.reduce((sum, d) => sum + d.attractions.length, 0)} 個景點
+          </span>
+        </div>
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400
+            text-lg leading-none transition-opacity disabled:cursor-not-allowed"
+        >
+          {deleting ? '…' : '×'}
+        </button>
       </div>
     </div>
   )

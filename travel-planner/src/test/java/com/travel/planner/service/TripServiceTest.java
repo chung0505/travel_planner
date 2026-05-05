@@ -22,6 +22,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -59,7 +60,6 @@ class TripServiceTest {
 
             assertThat(response.getTitle()).isEqualTo("東京之旅");
             assertThat(response.getDestination()).isEqualTo("東京");
-            // 2026-07-01 ~ 2026-07-05 inclusive = 5 days
             assertThat(response.getDailyPlans()).hasSize(5);
             assertThat(response.getTotalDays()).isEqualTo(5);
         }
@@ -163,6 +163,32 @@ class TripServiceTest {
             List<TripResponse> responses = tripService.getAllTrips();
 
             assertThat(responses).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("deleteTrip")
+    class DeleteTrip {
+
+        @Test
+        @DisplayName("存在的行程正常刪除")
+        void deletesTrip_whenFound() {
+            Trip trip = new Trip("東京之旅", "東京",
+                    LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 5), 2);
+            when(tripRepository.findById(1L)).thenReturn(Optional.of(trip));
+
+            tripService.deleteTrip(1L);
+
+            verify(tripRepository).delete(trip);
+        }
+
+        @Test
+        @DisplayName("行程不存在時拋出 ResourceNotFoundException")
+        void throwsNotFound_whenTripMissing() {
+            when(tripRepository.findById(99L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> tripService.deleteTrip(99L))
+                    .isInstanceOf(ResourceNotFoundException.class);
         }
     }
 }

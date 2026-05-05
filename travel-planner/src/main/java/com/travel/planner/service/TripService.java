@@ -13,10 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * UC-01: Create Trip
- * 負責建立行程並自動產生逐日行程架構
- */
 @Service
 public class TripService {
 
@@ -55,6 +51,12 @@ public class TripService {
         return tripRepository.findAll().stream()
                 .map(TripResponse::new)
                 .toList();
+    }
+
+    @Transactional
+    public void deleteTrip(Long tripId) {
+        Trip trip = findTripById(tripId);
+        tripRepository.delete(trip);
     }
 
     Trip findTripById(Long tripId) {
