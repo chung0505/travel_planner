@@ -1,13 +1,16 @@
 package com.travel.planner.model;
 
+import com.travel.planner.exception.InvalidInputException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("Trip")
 class TripTest {
@@ -27,6 +30,12 @@ class TripTest {
     @Nested
     @DisplayName("建構子")
     class Constructor {
+
+        @Test
+        @DisplayName("正確設定行程名稱")
+        void setsTitle() {
+            assertThat(trip.getTitle()).isEqualTo("東京之旅");
+        }
 
         @Test
         @DisplayName("正確設定目的地")
@@ -103,6 +112,81 @@ class TripTest {
         void setCompanionCount() {
             trip.setCompanionCount(5);
             assertThat(trip.getCompanionCount()).isEqualTo(5);
+        }
+    }
+
+    @Nested
+    @DisplayName("validateDates")
+    class ValidateDates {
+
+        @Test
+        @DisplayName("回程日期晚於出發日期時不拋出例外")
+        void doesNotThrow_whenReturnAfterDeparture() {
+            Trip.validateDates(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 5));
+        }
+
+        @Test
+        @DisplayName("回程日期與出發日期相同時拋出 InvalidInputException")
+        void throwsInvalidInput_whenReturnSameAsDeparture() {
+            LocalDate same = LocalDate.of(2026, 7, 1);
+            assertThatThrownBy(() -> Trip.validateDates(same, same))
+                    .isInstanceOf(InvalidInputException.class)
+                    .hasMessageContaining("回程日期必須晚於出發日期");
+        }
+
+        @Test
+        @DisplayName("回程日期早於出發日期時拋出 InvalidInputException")
+        void throwsInvalidInput_whenReturnBeforeDeparture() {
+            assertThatThrownBy(() -> Trip.validateDates(
+                    LocalDate.of(2026, 7, 5), LocalDate.of(2026, 7, 1)))
+                    .isInstanceOf(InvalidInputException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("generateDailyPlans")
+    class GenerateDailyPlans {
+
+        @Test
+        @DisplayName("5 天行程產生 5 個每日行程")
+        void generatesFiveDailyPlans_forFiveDayTrip() {
+            trip.generateDailyPlans();
+            assertThat(trip.getDailyPlans()).hasSize(5);
+        }
+
+        @Test
+        @DisplayName("每日行程的日期從出發日依序遞增")
+        void dailyPlanDates_areSequentialFromDeparture() {
+            trip.generateDailyPlans();
+            List<DailyPlan> plans = trip.getDailyPlans();
+            assertThat(plans.get(0).getDate()).isEqualTo(DEPARTURE);
+            assertThat(plans.get(1).getDate()).isEqualTo(DEPARTURE.plusDays(1));
+            assertThat(plans.get(4).getDate()).isEqualTo(DEPARTURE.plusDays(4));
+        }
+
+        @Test
+        @DisplayName("dayNumber 從 1 開始遞增")
+        void dayNumbers_startAtOneAndIncrement() {
+            trip.generateDailyPlans();
+            List<DailyPlan> plans = trip.getDailyPlans();
+            assertThat(plans.get(0).getDayNumber()).isEqualTo(1);
+            assertThat(plans.get(4).getDayNumber()).isEqualTo(5);
+        }
+
+        @Test
+        @DisplayName("出發日與回程日相同時只產生 1 個每日行程")
+        void generatesOneDailyPlan_whenSameDayTrip() {
+            Trip oneDayTrip = new Trip("一日遊", "東京",
+                    LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 1), 1);
+            oneDayTrip.generateDailyPlans();
+            assertThat(oneDayTrip.getDailyPlans()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("每個 DailyPlan 正確關聯此 Trip")
+        void eachDailyPlan_isLinkedToTrip() {
+            trip.generateDailyPlans();
+            assertThat(trip.getDailyPlans()).allMatch(p -> p.getTrip() == trip);
         }
     }
 

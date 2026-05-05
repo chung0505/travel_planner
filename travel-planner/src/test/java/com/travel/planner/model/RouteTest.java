@@ -82,23 +82,30 @@ class RouteTest {
     }
 
     @Nested
-    @DisplayName("setConfirmed")
-    class SetConfirmed {
+    @DisplayName("confirm")
+    class Confirm {
 
         @Test
-        @DisplayName("setConfirmed(true) 將路線標記為已確認")
-        void setConfirmedTrue() {
+        @DisplayName("confirm() 將路線標記為已確認")
+        void confirmSetsConfirmedTrue() {
             Route route = new Route(trip, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
-            route.setConfirmed(true);
+            route.confirm("[[25.0,121.0]]");
             assertThat(route.isConfirmed()).isTrue();
         }
 
         @Test
-        @DisplayName("setConfirmed(false) 可取消確認狀態")
-        void setConfirmedFalse() {
+        @DisplayName("confirm() 同時儲存路線幾何 JSON")
+        void confirmStoresGeometryJson() {
             Route route = new Route(trip, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
-            route.setConfirmed(true);
-            route.setConfirmed(false);
+            String geometry = "[[25.0,121.0],[25.1,121.1]]";
+            route.confirm(geometry);
+            assertThat(route.getGeometryJson()).isEqualTo(geometry);
+        }
+
+        @Test
+        @DisplayName("confirm() 前 confirmed 預設為 false")
+        void confirmedDefaultsFalseBeforeConfirm() {
+            Route route = new Route(trip, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
             assertThat(route.isConfirmed()).isFalse();
         }
     }
@@ -129,6 +136,57 @@ class RouteTest {
                     TransportationMethod.PUBLIC_TRANSIT,
                     TransportationMethod.TAXI
             );
+        }
+    }
+
+    @Nested
+    @DisplayName("calculateCost")
+    class CalculateCost {
+
+        @Test
+        @DisplayName("步行費用為 0")
+        void walking_isZeroCost() {
+            BigDecimal cost = Route.calculateCost(TransportationMethod.WALKING, 5000);
+            assertThat(cost).isEqualByComparingTo(BigDecimal.ZERO);
+        }
+
+        @Test
+        @DisplayName("大眾運輸費用為固定 30 元")
+        void publicTransit_isFixedThirtyNtd() {
+            BigDecimal cost = Route.calculateCost(TransportationMethod.PUBLIC_TRANSIT, 10000);
+            assertThat(cost).isEqualByComparingTo(new BigDecimal("30"));
+        }
+
+        @Test
+        @DisplayName("計程車距離在起跳範圍內（≤ 1.25 km）費用為 85 元")
+        void taxi_withinFlagFall_isEightyFiveNtd() {
+            BigDecimal cost = Route.calculateCost(TransportationMethod.TAXI, 1000);
+            assertThat(cost).isEqualByComparingTo(new BigDecimal("85"));
+        }
+
+        @Test
+        @DisplayName("計程車超過起跳距離後每 200m 加 5 元")
+        void taxi_beyondFlagFall_addsPerDistanceFare() {
+            // 1.25 km 起跳後 200m → 85 + 5 = 90
+            BigDecimal cost = Route.calculateCost(TransportationMethod.TAXI, 1450);
+            assertThat(cost).isEqualByComparingTo(new BigDecimal("90"));
+        }
+
+        @Test
+        @DisplayName("計程車長距離費用正確累加")
+        void taxi_longDistance_accumulatesFareCorrectly() {
+            // 起跳 1.25km + 1km = 1.25 + 5 段 × 200m = 85 + 25 = 110
+            BigDecimal cost = Route.calculateCost(TransportationMethod.TAXI, 2250);
+            assertThat(cost).isEqualByComparingTo(new BigDecimal("110"));
+        }
+
+        @Test
+        @DisplayName("步行不論距離長短費用皆為 0")
+        void walking_anyDistance_isAlwaysZero() {
+            assertThat(Route.calculateCost(TransportationMethod.WALKING, 0))
+                    .isEqualByComparingTo(BigDecimal.ZERO);
+            assertThat(Route.calculateCost(TransportationMethod.WALKING, 50000))
+                    .isEqualByComparingTo(BigDecimal.ZERO);
         }
     }
 

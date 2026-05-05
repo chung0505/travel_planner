@@ -94,8 +94,7 @@ public class RouteService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Route route = new Route(trip, request.getAttractionIds(), method, totalMinutes, totalCost);
-        route.setConfirmed(true);
-        route.setGeometryJson(serializeGeometry(orsResult.geometry()));
+        route.confirm(serializeGeometry(orsResult.geometry()));
 
         Route saved = routeRepository.save(route);
         return new RouteResponse(saved, orsResult.geometry());
@@ -170,11 +169,11 @@ public class RouteService {
                 if (legFares != null && i < legFares.size() && legFares.get(i) != null) {
                     cost = BigDecimal.valueOf(Math.round(legFares.get(i)));
                 } else {
-                    cost = calculateCost(method, legData.get(i)[0]);
+                    cost = Route.calculateCost(method, legData.get(i)[0]);
                 }
             } else {
                 minutes = (int) Math.round(orsResult.durationSeconds() / 60.0 / segmentCount);
-                cost = calculateCost(method, orsResult.distanceMeters())
+                cost = Route.calculateCost(method, orsResult.distanceMeters())
                         .divide(BigDecimal.valueOf(segmentCount), 0, RoundingMode.CEILING);
             }
             // transit steps（捷運/公車換乘步驟）
@@ -191,19 +190,6 @@ public class RouteService {
             ));
         }
         return segments;
-    }
-
-    /**
-     * 依交通方式計算費用（台灣費率）
-     */
-    private BigDecimal calculateCost(TransportationMethod method, double distanceMeters) {
-        double km = distanceMeters / 1000.0;
-        double fare = switch (method) {
-            case WALKING -> 0;
-            case PUBLIC_TRANSIT -> 30; // 固定票價估算（依距離計算較複雜，以固定值代替）
-            case TAXI -> 85 + Math.max(0, (km - 1.25) / 0.2 * 5); // 起跳 85 元，每 200m +5 元
-        };
-        return BigDecimal.valueOf(Math.round(fare));
     }
 
     private String serializeGeometry(List<double[]> geometry) {

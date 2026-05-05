@@ -234,7 +234,7 @@ class RouteServiceTest {
             Route route = new Route(trip, List.of(101L, 102L),
                     TransportationMethod.WALKING, 20, BigDecimal.ZERO);
             ReflectionTestUtils.setField(route, "id", 50L);
-            route.setGeometryJson("[]");
+            route.confirm("[]");
 
             when(tripService.findTripById(1L)).thenReturn(trip);
             when(routeRepository.findByTripId(1L)).thenReturn(List.of(route));
@@ -267,7 +267,7 @@ class RouteServiceTest {
             Route route = new Route(trip, List.of(101L, 102L),
                     TransportationMethod.TAXI, 15, new BigDecimal("129"));
             ReflectionTestUtils.setField(route, "id", 50L);
-            route.setGeometryJson("[]");
+            route.confirm("[]");
 
             when(tripService.findTripById(1L)).thenReturn(trip);
             when(routeRepository.findById(50L)).thenReturn(Optional.of(route));

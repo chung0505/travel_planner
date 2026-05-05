@@ -1,5 +1,6 @@
 package com.travel.planner.model;
 
+import com.travel.planner.exception.InvalidInputException;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
@@ -60,4 +61,30 @@ public class Trip {
     public void setDepartureDate(LocalDate departureDate) { this.departureDate = departureDate; }
     public void setReturnDate(LocalDate returnDate) { this.returnDate = returnDate; }
     public void setCompanionCount(int companionCount) { this.companionCount = companionCount; }
+
+    // ── Domain behaviour ────────────────────────────────────────────────────
+
+    /**
+     * 驗證出發日期與回程日期的合法性。
+     * 回程日期必須晚於出發日期，否則拋出 InvalidInputException。
+     */
+    public static void validateDates(LocalDate departureDate, LocalDate returnDate) {
+        if (!returnDate.isAfter(departureDate)) {
+            throw new InvalidInputException("回程日期必須晚於出發日期");
+        }
+    }
+
+    /**
+     * 根據出發日期與回程日期，自動產生每日行程（DailyPlan）並加入此行程。
+     * 每天一筆，從出發日到回程日（含）。
+     */
+    public void generateDailyPlans() {
+        LocalDate current = this.departureDate;
+        int dayNumber = 1;
+        while (!current.isAfter(this.returnDate)) {
+            this.dailyPlans.add(new DailyPlan(this, current, dayNumber));
+            current = current.plusDays(1);
+            dayNumber++;
+        }
+    }
 }

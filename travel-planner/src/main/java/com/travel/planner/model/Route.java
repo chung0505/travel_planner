@@ -60,8 +60,34 @@ public class Route {
     public int getEstimatedDurationMinutes() { return estimatedDurationMinutes; }
     public BigDecimal getEstimatedCost() { return estimatedCost; }
     public boolean isConfirmed() { return confirmed; }
-
     public String getGeometryJson() { return geometryJson; }
-    public void setConfirmed(boolean confirmed) { this.confirmed = confirmed; }
-    public void setGeometryJson(String geometryJson) { this.geometryJson = geometryJson; }
+
+    // ── Domain behaviour ────────────────────────────────────────────────────
+
+    /**
+     * 將路線標記為已確認，並儲存路線幾何（序列化後的 JSON 字串）。
+     * 將兩個相關狀態變更封裝為單一領域操作。
+     */
+    public void confirm(String geometryJson) {
+        this.confirmed = true;
+        this.geometryJson = geometryJson;
+    }
+
+    /**
+     * 依交通方式與距離計算費用（台灣費率）。
+     * <ul>
+     *   <li>步行：免費</li>
+     *   <li>大眾運輸：固定估算 30 元（API 回傳實際票價時由呼叫端覆蓋）</li>
+     *   <li>計程車：起跳 85 元，超過 1.25 km 後每 200m 加 5 元</li>
+     * </ul>
+     */
+    public static BigDecimal calculateCost(TransportationMethod method, double distanceMeters) {
+        double km = distanceMeters / 1000.0;
+        double fare = switch (method) {
+            case WALKING -> 0;
+            case PUBLIC_TRANSIT -> 30;
+            case TAXI -> 85 + Math.max(0, (km - 1.25) / 0.2 * 5);
+        };
+        return BigDecimal.valueOf(Math.round(fare));
+    }
 }

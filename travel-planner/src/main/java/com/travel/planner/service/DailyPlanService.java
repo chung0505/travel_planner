@@ -3,9 +3,7 @@ package com.travel.planner.service;
 import com.travel.planner.dto.request.AddAttractionRequest;
 import com.travel.planner.dto.response.AttractionResponse;
 import com.travel.planner.dto.response.DailyPlanResponse;
-import com.travel.planner.exception.InvalidInputException;
 import com.travel.planner.exception.ResourceNotFoundException;
-import com.travel.planner.exception.TimeConflictException;
 import com.travel.planner.model.Attraction;
 import com.travel.planner.model.DailyPlan;
 import com.travel.planner.repository.DailyPlanRepository;
@@ -14,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalTime;
 import java.util.List;
 
 /**
@@ -54,21 +51,21 @@ public class DailyPlanService {
 
     @Transactional
     public DailyPlanResponse addAttraction(Long tripId, Long dailyPlanId, AddAttractionRequest request) {
-        validateAttractionTimes(request.getStartTime(), request.getEndTime());
+        DailyPlan.validateAttractionTimes(request.getStartTime(), request.getEndTime());
 
         DailyPlan dailyPlan = findDailyPlan(tripId, dailyPlanId);
 
-        checkTimeConflict(dailyPlan, request.getStartTime(), request.getEndTime(), null);
+        dailyPlan.checkTimeConflict(request.getStartTime(), request.getEndTime(), null);
 
-        Attraction attraction = new Attraction(
-                dailyPlan,
+        // 委派給 DailyPlan 建立並加入景點（純領域邏輯）
+        Attraction attraction = dailyPlan.addAttraction(
                 request.getName(),
                 request.getAddress(),
                 request.getStartTime(),
                 request.getEndTime()
         );
 
-        // 自動將地址轉換為經緯度（失敗時不阻擋新增，僅記錄 log）
+        // Geocoding 屬於基礎設施關注點，保留在 Service 層
         double[] latLng = orsService.geocode(request.getAddress());
         if (latLng != null) {
             attraction.setLatitude(latLng[0]);
@@ -76,8 +73,6 @@ public class DailyPlanService {
         } else {
             log.warn("景點「{}」地址無法 Geocoding，路線規劃將無法使用此景點", request.getName());
         }
-
-        dailyPlan.getAttractions().add(attraction);
 
         DailyPlan saved = dailyPlanRepository.save(dailyPlan);
         return new DailyPlanResponse(saved);
@@ -102,28 +97,5 @@ public class DailyPlanService {
         return dailyPlanRepository.findByIdAndTripId(dailyPlanId, tripId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "找不到行程 ID " + tripId + " 中的每日行程 ID: " + dailyPlanId));
-    }
-
-    private void validateAttractionTimes(LocalTime startTime, LocalTime endTime) {
-        if (!endTime.isAfter(startTime)) {
-            throw new InvalidInputException("結束時間必須晚於開始時間");
-        }
-    }
-
-    private void checkTimeConflict(DailyPlan dailyPlan, LocalTime startTime, LocalTime endTime, Long excludeId) {
-        dailyPlan.getAttractions().stream()
-                .filter(a -> excludeId == null || !a.getId().equals(excludeId))
-                .filter(a -> isTimeOverlap(a.getStartTime(), a.getEndTime(), startTime, endTime))
-                .findFirst()
-                .ifPresent(conflict -> {
-                    throw new TimeConflictException(
-                            String.format("時間衝突：與景點「%s」（%s ~ %s）發生重疊",
-                                    conflict.getName(), conflict.getStartTime(), conflict.getEndTime()));
-                });
-    }
-
-    private boolean isTimeOverlap(LocalTime existStart, LocalTime existEnd,
-                                   LocalTime newStart, LocalTime newEnd) {
-        return newStart.isBefore(existEnd) && newEnd.isAfter(existStart);
     }
 }
