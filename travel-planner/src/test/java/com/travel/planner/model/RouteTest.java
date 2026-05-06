@@ -17,12 +17,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("Route")
 class RouteTest {
 
-    private Trip trip;
+    private DailyPlan dailyPlan;
     private List<Long> attractionIds;
 
     @BeforeEach
     void setUp() {
-        trip = new Trip("東京之旅", "東京", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 3), 2);
+        Trip trip = new Trip("東京之旅", "東京", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 3), 2);
+        dailyPlan = new DailyPlan(trip, LocalDate.of(2026, 7, 1), 1);
         attractionIds = List.of(1L, 2L, 3L);
     }
 
@@ -31,30 +32,30 @@ class RouteTest {
     class Constructor {
 
         @Test
-        @DisplayName("正確關聯所屬 Trip")
-        void setsTrip() {
-            Route route = new Route(trip, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
-            assertThat(route.getTrip()).isSameAs(trip);
+        @DisplayName("正確關聯所屬 DailyPlan")
+        void setsDailyPlan() {
+            Route route = new Route(dailyPlan, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
+            assertThat(route.getDailyPlan()).isSameAs(dailyPlan);
         }
 
         @Test
         @DisplayName("正確設定景點 ID 清單")
         void setsAttractionIds() {
-            Route route = new Route(trip, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
+            Route route = new Route(dailyPlan, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
             assertThat(route.getAttractionIds()).containsExactly(1L, 2L, 3L);
         }
 
         @Test
         @DisplayName("正確設定交通方式")
         void setsTransportationMethod() {
-            Route route = new Route(trip, attractionIds, TransportationMethod.PUBLIC_TRANSIT, 30, new BigDecimal("30"));
+            Route route = new Route(dailyPlan, attractionIds, TransportationMethod.PUBLIC_TRANSIT, 30, new BigDecimal("30"));
             assertThat(route.getTransportationMethod()).isEqualTo(TransportationMethod.PUBLIC_TRANSIT);
         }
 
         @Test
         @DisplayName("正確設定預估時間（分鐘）")
         void setsEstimatedDurationMinutes() {
-            Route route = new Route(trip, attractionIds, TransportationMethod.TAXI, 20, new BigDecimal("150"));
+            Route route = new Route(dailyPlan, attractionIds, TransportationMethod.TAXI, 20, new BigDecimal("150"));
             assertThat(route.getEstimatedDurationMinutes()).isEqualTo(20);
         }
 
@@ -62,21 +63,21 @@ class RouteTest {
         @DisplayName("正確設定預估費用")
         void setsEstimatedCost() {
             BigDecimal cost = new BigDecimal("250.00");
-            Route route = new Route(trip, attractionIds, TransportationMethod.TAXI, 20, cost);
+            Route route = new Route(dailyPlan, attractionIds, TransportationMethod.TAXI, 20, cost);
             assertThat(route.getEstimatedCost()).isEqualByComparingTo(cost);
         }
 
         @Test
         @DisplayName("confirmed 預設為 false")
         void confirmedDefaultsFalse() {
-            Route route = new Route(trip, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
+            Route route = new Route(dailyPlan, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
             assertThat(route.isConfirmed()).isFalse();
         }
 
         @Test
         @DisplayName("id 初始為 null")
         void idIsNullBeforePersistence() {
-            Route route = new Route(trip, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
+            Route route = new Route(dailyPlan, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
             assertThat(route.getId()).isNull();
         }
     }
@@ -88,7 +89,7 @@ class RouteTest {
         @Test
         @DisplayName("confirm() 將路線標記為已確認")
         void confirmSetsConfirmedTrue() {
-            Route route = new Route(trip, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
+            Route route = new Route(dailyPlan, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
             route.confirm("[[25.0,121.0]]");
             assertThat(route.isConfirmed()).isTrue();
         }
@@ -96,7 +97,7 @@ class RouteTest {
         @Test
         @DisplayName("confirm() 同時儲存路線幾何 JSON")
         void confirmStoresGeometryJson() {
-            Route route = new Route(trip, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
+            Route route = new Route(dailyPlan, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
             String geometry = "[[25.0,121.0],[25.1,121.1]]";
             route.confirm(geometry);
             assertThat(route.getGeometryJson()).isEqualTo(geometry);
@@ -105,7 +106,7 @@ class RouteTest {
         @Test
         @DisplayName("confirm() 前 confirmed 預設為 false")
         void confirmedDefaultsFalseBeforeConfirm() {
-            Route route = new Route(trip, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
+            Route route = new Route(dailyPlan, attractionIds, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
             assertThat(route.isConfirmed()).isFalse();
         }
     }
@@ -118,12 +119,12 @@ class RouteTest {
         @EnumSource(TransportationMethod.class)
         @DisplayName("所有交通方式皆可建立路線")
         void allTransportationMethodsAreValid(TransportationMethod method) {
-            Route route = new Route(trip, attractionIds, method, 30, new BigDecimal("50"));
+            Route route = new Route(dailyPlan, attractionIds, method, 30, new BigDecimal("50"));
             assertThat(route.getTransportationMethod()).isEqualTo(method);
         }
 
         @Test
-        @DisplayName("TransportationMethod 共有四種")
+        @DisplayName("TransportationMethod 共有三種")
         void hasThreeMethods() {
             assertThat(TransportationMethod.values()).hasSize(3);
         }
@@ -167,7 +168,6 @@ class RouteTest {
         @Test
         @DisplayName("計程車超過起跳距離後每 200m 加 5 元")
         void taxi_beyondFlagFall_addsPerDistanceFare() {
-            // 1.25 km 起跳後 200m → 85 + 5 = 90
             BigDecimal cost = Route.calculateCost(TransportationMethod.TAXI, 1450);
             assertThat(cost).isEqualByComparingTo(new BigDecimal("90"));
         }
@@ -175,7 +175,6 @@ class RouteTest {
         @Test
         @DisplayName("計程車長距離費用正確累加")
         void taxi_longDistance_accumulatesFareCorrectly() {
-            // 起跳 1.25km + 1km = 1.25 + 5 段 × 200m = 85 + 25 = 110
             BigDecimal cost = Route.calculateCost(TransportationMethod.TAXI, 2250);
             assertThat(cost).isEqualByComparingTo(new BigDecimal("110"));
         }
@@ -198,21 +197,21 @@ class RouteTest {
         @DisplayName("景點順序與輸入順序相同（路線有方向性）")
         void preservesAttractionOrder() {
             List<Long> ordered = List.of(3L, 1L, 2L);
-            Route route = new Route(trip, ordered, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
+            Route route = new Route(dailyPlan, ordered, TransportationMethod.WALKING, 60, BigDecimal.ZERO);
             assertThat(route.getAttractionIds()).containsExactly(3L, 1L, 2L);
         }
 
         @Test
         @DisplayName("兩個景點可建立路線（最小有效路線）")
         void twoAttractionsIsMinimumValidRoute() {
-            Route route = new Route(trip, List.of(1L, 2L), TransportationMethod.WALKING, 60, BigDecimal.ZERO);
+            Route route = new Route(dailyPlan, List.of(1L, 2L), TransportationMethod.WALKING, 60, BigDecimal.ZERO);
             assertThat(route.getAttractionIds()).hasSize(2);
         }
 
         @Test
         @DisplayName("費用為零（步行）可正常建立")
         void zeroCostIsValid() {
-            Route route = new Route(trip, List.of(1L, 2L), TransportationMethod.WALKING, 60, BigDecimal.ZERO);
+            Route route = new Route(dailyPlan, List.of(1L, 2L), TransportationMethod.WALKING, 60, BigDecimal.ZERO);
             assertThat(route.getEstimatedCost()).isEqualByComparingTo(BigDecimal.ZERO);
         }
     }

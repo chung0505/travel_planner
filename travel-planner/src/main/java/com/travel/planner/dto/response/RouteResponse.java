@@ -9,7 +9,7 @@ import java.util.List;
 public class RouteResponse {
 
     private final Long id;
-    private final Long tripId;
+    private final Long dailyPlanId;
     private final List<Long> attractionIds;
     private final TransportationMethod transportationMethod;
     private final int estimatedDurationMinutes;
@@ -19,7 +19,7 @@ public class RouteResponse {
 
     public RouteResponse(Route route, List<double[]> geometry) {
         this.id = route.getId();
-        this.tripId = route.getTrip().getId();
+        this.dailyPlanId = route.getDailyPlan().getId();
         this.attractionIds = route.getAttractionIds();
         this.transportationMethod = route.getTransportationMethod();
         this.estimatedDurationMinutes = route.getEstimatedDurationMinutes();
@@ -29,7 +29,7 @@ public class RouteResponse {
     }
 
     public Long getId() { return id; }
-    public Long getTripId() { return tripId; }
+    public Long getDailyPlanId() { return dailyPlanId; }
     public List<Long> getAttractionIds() { return attractionIds; }
     public TransportationMethod getTransportationMethod() { return transportationMethod; }
     public int getEstimatedDurationMinutes() { return estimatedDurationMinutes; }

@@ -16,8 +16,8 @@ public class Route {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "trip_id", nullable = false)
-    private Trip trip;
+    @JoinColumn(name = "daily_plan_id", nullable = false)
+    private DailyPlan dailyPlan;
 
     @ElementCollection
     @CollectionTable(name = "route_attraction_ids", joinColumns = @JoinColumn(name = "route_id"))
@@ -43,9 +43,9 @@ public class Route {
 
     protected Route() {}
 
-    public Route(Trip trip, List<Long> attractionIds, TransportationMethod transportationMethod,
+    public Route(DailyPlan dailyPlan, List<Long> attractionIds, TransportationMethod transportationMethod,
                  int estimatedDurationMinutes, BigDecimal estimatedCost) {
-        this.trip = trip;
+        this.dailyPlan = dailyPlan;
         this.attractionIds = attractionIds;
         this.transportationMethod = transportationMethod;
         this.estimatedDurationMinutes = estimatedDurationMinutes;
@@ -54,7 +54,7 @@ public class Route {
     }
 
     public Long getId() { return id; }
-    public Trip getTrip() { return trip; }
+    public DailyPlan getDailyPlan() { return dailyPlan; }
     public List<Long> getAttractionIds() { return attractionIds; }
     public TransportationMethod getTransportationMethod() { return transportationMethod; }
     public int getEstimatedDurationMinutes() { return estimatedDurationMinutes; }

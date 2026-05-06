@@ -93,7 +93,7 @@ public class DailyPlanService {
         return response;
     }
 
-    private DailyPlan findDailyPlan(Long tripId, Long dailyPlanId) {
+    DailyPlan findDailyPlan(Long tripId, Long dailyPlanId) {
         return dailyPlanRepository.findByIdAndTripId(dailyPlanId, tripId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "找不到行程 ID " + tripId + " 中的每日行程 ID: " + dailyPlanId));

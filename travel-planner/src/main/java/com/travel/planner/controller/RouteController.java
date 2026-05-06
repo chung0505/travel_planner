@@ -16,7 +16,7 @@ import java.util.List;
  * UC-02: Plan Route
  */
 @RestController
-@RequestMapping("/api/trips/{tripId}/routes")
+@RequestMapping("/api/trips/{tripId}/daily-plans/{dailyPlanId}/routes")
 public class RouteController {
 
     private final RouteService routeService;
@@ -29,25 +29,29 @@ public class RouteController {
     @PostMapping("/estimate")
     public ResponseEntity<ApiResponse<RouteEstimateResponse>> estimateRoute(
             @PathVariable Long tripId,
+            @PathVariable Long dailyPlanId,
             @Valid @RequestBody PlanRouteRequest request) {
-        RouteEstimateResponse response = routeService.estimateRoute(tripId, request);
+        RouteEstimateResponse response = routeService.estimateRoute(tripId, dailyPlanId, request);
         return ResponseEntity.ok(ApiResponse.success("路線估算完成", response));
     }
 
-    /** UC-02: 使用者確認路線，儲存至行程 */
+    /** UC-02: 使用者確認路線，儲存至每日行程 */
     @PostMapping("/confirm")
     public ResponseEntity<ApiResponse<RouteResponse>> confirmRoute(
             @PathVariable Long tripId,
+            @PathVariable Long dailyPlanId,
             @Valid @RequestBody PlanRouteRequest request) {
-        RouteResponse response = routeService.confirmRoute(tripId, request);
+        RouteResponse response = routeService.confirmRoute(tripId, dailyPlanId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("路線規劃已確認並儲存", response));
     }
 
-    /** 取得行程中所有已確認的路線 */
+    /** 取得每日行程中所有已確認的路線 */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<RouteResponse>>> getRoutes(@PathVariable Long tripId) {
-        List<RouteResponse> responses = routeService.getRoutes(tripId);
+    public ResponseEntity<ApiResponse<List<RouteResponse>>> getRoutes(
+            @PathVariable Long tripId,
+            @PathVariable Long dailyPlanId) {
+        List<RouteResponse> responses = routeService.getRoutes(tripId, dailyPlanId);
         return ResponseEntity.ok(ApiResponse.success(responses));
     }
 
@@ -55,8 +59,9 @@ public class RouteController {
     @GetMapping("/{routeId}")
     public ResponseEntity<ApiResponse<RouteResponse>> getRoute(
             @PathVariable Long tripId,
+            @PathVariable Long dailyPlanId,
             @PathVariable Long routeId) {
-        RouteResponse response = routeService.getRoute(tripId, routeId);
+        RouteResponse response = routeService.getRoute(tripId, dailyPlanId, routeId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

@@ -34,9 +34,6 @@ public class Trip {
     @OrderBy("date ASC")
     private List<DailyPlan> dailyPlans = new ArrayList<>();
 
-    @OneToMany(mappedBy = "trip", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Route> routes = new ArrayList<>();
-
     protected Trip() {}
 
     public Trip(String title, String destination, LocalDate departureDate, LocalDate returnDate, int companionCount) {
@@ -54,7 +51,6 @@ public class Trip {
     public LocalDate getReturnDate() { return returnDate; }
     public int getCompanionCount() { return companionCount; }
     public List<DailyPlan> getDailyPlans() { return dailyPlans; }
-    public List<Route> getRoutes() { return routes; }
 
     public void setTitle(String title) { this.title = title; }
     public void setDestination(String destination) { this.destination = destination; }

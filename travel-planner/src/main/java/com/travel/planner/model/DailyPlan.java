@@ -31,6 +31,9 @@ public class DailyPlan {
     @OrderBy("startTime ASC")
     private List<Attraction> attractions = new ArrayList<>();
 
+    @OneToMany(mappedBy = "dailyPlan", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Route> routes = new ArrayList<>();
+
     protected DailyPlan() {}
 
     public DailyPlan(Trip trip, LocalDate date, int dayNumber) {
@@ -44,6 +47,7 @@ public class DailyPlan {
     public LocalDate getDate() { return date; }
     public int getDayNumber() { return dayNumber; }
     public List<Attraction> getAttractions() { return attractions; }
+    public List<Route> getRoutes() { return routes; }
 
     // ── Domain behaviour ────────────────────────────────────────────────────
 

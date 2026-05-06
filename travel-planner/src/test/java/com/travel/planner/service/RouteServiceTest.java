@@ -38,39 +38,31 @@ import static org.mockito.Mockito.when;
 @DisplayName("RouteService")
 class RouteServiceTest {
 
-    @Mock
-    private RouteRepository routeRepository;
-
-    @Mock
-    private AttractionRepository attractionRepository;
-
-    @Mock
-    private TripService tripService;
-
-    @Mock
-    private OrsService orsService;
+    @Mock private RouteRepository routeRepository;
+    @Mock private AttractionRepository attractionRepository;
+    @Mock private DailyPlanService dailyPlanService;
+    @Mock private OrsService orsService;
 
     @InjectMocks
     private RouteService routeService;
 
-    // ObjectMapper is a real instance (not mocked) since it's a value type
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private Trip trip;
+    private DailyPlan dailyPlan;
     private Attraction attractionA;
     private Attraction attractionB;
     private PlanRouteRequest request;
 
     @BeforeEach
     void setUp() {
-        // Inject the real ObjectMapper via field injection
         ReflectionTestUtils.setField(routeService, "objectMapper", objectMapper);
 
         trip = new Trip("東京之旅", "東京",
                 LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 5), 2);
         ReflectionTestUtils.setField(trip, "id", 1L);
 
-        DailyPlan dailyPlan = new DailyPlan(trip, LocalDate.of(2026, 7, 1), 1);
+        dailyPlan = new DailyPlan(trip, LocalDate.of(2026, 7, 1), 1);
         ReflectionTestUtils.setField(dailyPlan, "id", 10L);
 
         attractionA = new Attraction(dailyPlan, "淺草寺",
@@ -97,8 +89,8 @@ class RouteServiceTest {
         @Test
         @DisplayName("步行路線：正確計算分鐘數，費用為 0")
         void estimatesRoute_walking_zeroCost() {
-            when(tripService.findTripById(1L)).thenReturn(trip);
-            when(attractionRepository.findByTripIdOrderByDateAndTime(1L))
+            when(dailyPlanService.findDailyPlan(1L, 10L)).thenReturn(dailyPlan);
+            when(attractionRepository.findByDailyPlanIdOrderByStartTimeAsc(10L))
                     .thenReturn(List.of(attractionA, attractionB));
             OrsRouteResult orsResult = new OrsRouteResult(
                     2000, 1200,
@@ -107,7 +99,7 @@ class RouteServiceTest {
             );
             when(orsService.getDirections(any(), any(), any())).thenReturn(orsResult);
 
-            RouteEstimateResponse response = routeService.estimateRoute(1L, request);
+            RouteEstimateResponse response = routeService.estimateRoute(1L, 10L, request);
 
             assertThat(response.getTotalEstimatedMinutes()).isEqualTo(20);
             assertThat(response.getTotalEstimatedCost()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -120,10 +112,9 @@ class RouteServiceTest {
         @DisplayName("計程車路線：依距離正確估算費用")
         void estimatesRoute_taxi_correctFare() {
             request.setTransportationMethod(TransportationMethod.TAXI);
-            when(tripService.findTripById(1L)).thenReturn(trip);
-            when(attractionRepository.findByTripIdOrderByDateAndTime(1L))
+            when(dailyPlanService.findDailyPlan(1L, 10L)).thenReturn(dailyPlan);
+            when(attractionRepository.findByDailyPlanIdOrderByStartTimeAsc(10L))
                     .thenReturn(List.of(attractionA, attractionB));
-            // 距離 3000m → 85 + (3 - 1.25) / 0.2 * 5 = 85 + 43.75 = 128.75 → round = 129
             OrsRouteResult orsResult = new OrsRouteResult(
                     3000, 600,
                     List.of(), List.of(new double[]{3000, 600}),
@@ -131,7 +122,7 @@ class RouteServiceTest {
             );
             when(orsService.getDirections(any(), any(), any())).thenReturn(orsResult);
 
-            RouteEstimateResponse response = routeService.estimateRoute(1L, request);
+            RouteEstimateResponse response = routeService.estimateRoute(1L, 10L, request);
 
             assertThat(response.getTotalEstimatedCost()).isEqualByComparingTo(new BigDecimal("129"));
         }
@@ -140,8 +131,8 @@ class RouteServiceTest {
         @DisplayName("大眾運輸：使用 API 回傳的實際票價")
         void estimatesRoute_transit_usesApiFare() {
             request.setTransportationMethod(TransportationMethod.PUBLIC_TRANSIT);
-            when(tripService.findTripById(1L)).thenReturn(trip);
-            when(attractionRepository.findByTripIdOrderByDateAndTime(1L))
+            when(dailyPlanService.findDailyPlan(1L, 10L)).thenReturn(dailyPlan);
+            when(attractionRepository.findByDailyPlanIdOrderByStartTimeAsc(10L))
                     .thenReturn(List.of(attractionA, attractionB));
             OrsRouteResult orsResult = new OrsRouteResult(
                     5000, 900,
@@ -150,7 +141,7 @@ class RouteServiceTest {
             );
             when(orsService.getDirections(any(), any(), any())).thenReturn(orsResult);
 
-            RouteEstimateResponse response = routeService.estimateRoute(1L, request);
+            RouteEstimateResponse response = routeService.estimateRoute(1L, 10L, request);
 
             assertThat(response.getTotalEstimatedCost()).isEqualByComparingTo(new BigDecimal("180"));
         }
@@ -159,11 +150,11 @@ class RouteServiceTest {
         @DisplayName("景點少於兩個時拋出 InvalidInputException")
         void throwsInvalidInput_whenLessThanTwoAttractions() {
             request.setAttractionIds(List.of(101L));
-            when(tripService.findTripById(1L)).thenReturn(trip);
-            when(attractionRepository.findByTripIdOrderByDateAndTime(1L))
+            when(dailyPlanService.findDailyPlan(1L, 10L)).thenReturn(dailyPlan);
+            when(attractionRepository.findByDailyPlanIdOrderByStartTimeAsc(10L))
                     .thenReturn(List.of(attractionA));
 
-            assertThatThrownBy(() -> routeService.estimateRoute(1L, request))
+            assertThatThrownBy(() -> routeService.estimateRoute(1L, 10L, request))
                     .isInstanceOf(InvalidInputException.class);
         }
 
@@ -172,24 +163,23 @@ class RouteServiceTest {
         void throwsInvalidInput_whenAttractionMissingCoordinates() {
             attractionA.setLatitude(null);
             attractionA.setLongitude(null);
-            when(tripService.findTripById(1L)).thenReturn(trip);
-            when(attractionRepository.findByTripIdOrderByDateAndTime(1L))
+            when(dailyPlanService.findDailyPlan(1L, 10L)).thenReturn(dailyPlan);
+            when(attractionRepository.findByDailyPlanIdOrderByStartTimeAsc(10L))
                     .thenReturn(List.of(attractionA, attractionB));
 
-            assertThatThrownBy(() -> routeService.estimateRoute(1L, request))
+            assertThatThrownBy(() -> routeService.estimateRoute(1L, 10L, request))
                     .isInstanceOf(InvalidInputException.class);
         }
 
         @Test
-        @DisplayName("景點 ID 不屬於此行程時拋出 InvalidInputException")
-        void throwsInvalidInput_whenAttractionNotBelongToTrip() {
+        @DisplayName("景點 ID 不屬於此每日行程時拋出 InvalidInputException")
+        void throwsInvalidInput_whenAttractionNotBelongToDailyPlan() {
             request.setAttractionIds(List.of(101L, 999L));
-            when(tripService.findTripById(1L)).thenReturn(trip);
-            // 只回傳 attractionA，999L 不存在
-            when(attractionRepository.findByTripIdOrderByDateAndTime(1L))
+            when(dailyPlanService.findDailyPlan(1L, 10L)).thenReturn(dailyPlan);
+            when(attractionRepository.findByDailyPlanIdOrderByStartTimeAsc(10L))
                     .thenReturn(List.of(attractionA));
 
-            assertThatThrownBy(() -> routeService.estimateRoute(1L, request))
+            assertThatThrownBy(() -> routeService.estimateRoute(1L, 10L, request))
                     .isInstanceOf(InvalidInputException.class);
         }
     }
@@ -201,8 +191,8 @@ class RouteServiceTest {
         @Test
         @DisplayName("成功儲存路線，confirmed 為 true")
         void confirmsRoute_savesAsConfirmed() {
-            when(tripService.findTripById(1L)).thenReturn(trip);
-            when(attractionRepository.findByTripIdOrderByDateAndTime(1L))
+            when(dailyPlanService.findDailyPlan(1L, 10L)).thenReturn(dailyPlan);
+            when(attractionRepository.findByDailyPlanIdOrderByStartTimeAsc(10L))
                     .thenReturn(List.of(attractionA, attractionB));
             OrsRouteResult orsResult = new OrsRouteResult(
                     2000, 1200,
@@ -216,11 +206,12 @@ class RouteServiceTest {
                 return r;
             });
 
-            RouteResponse response = routeService.confirmRoute(1L, request);
+            RouteResponse response = routeService.confirmRoute(1L, 10L, request);
 
             assertThat(response.isConfirmed()).isTrue();
             assertThat(response.getTransportationMethod()).isEqualTo(TransportationMethod.WALKING);
             assertThat(response.getEstimatedDurationMinutes()).isEqualTo(20);
+            assertThat(response.getDailyPlanId()).isEqualTo(10L);
         }
     }
 
@@ -229,17 +220,17 @@ class RouteServiceTest {
     class GetRoutes {
 
         @Test
-        @DisplayName("回傳行程下所有路線")
-        void returnsRoutes_forTrip() {
-            Route route = new Route(trip, List.of(101L, 102L),
+        @DisplayName("回傳每日行程下所有路線")
+        void returnsRoutes_forDailyPlan() {
+            Route route = new Route(dailyPlan, List.of(101L, 102L),
                     TransportationMethod.WALKING, 20, BigDecimal.ZERO);
             ReflectionTestUtils.setField(route, "id", 50L);
             route.confirm("[]");
 
-            when(tripService.findTripById(1L)).thenReturn(trip);
-            when(routeRepository.findByTripId(1L)).thenReturn(List.of(route));
+            when(dailyPlanService.findDailyPlan(1L, 10L)).thenReturn(dailyPlan);
+            when(routeRepository.findByDailyPlanId(10L)).thenReturn(List.of(route));
 
-            List<RouteResponse> result = routeService.getRoutes(1L);
+            List<RouteResponse> result = routeService.getRoutes(1L, 10L);
 
             assertThat(result).hasSize(1);
             assertThat(result.get(0).getTransportationMethod()).isEqualTo(TransportationMethod.WALKING);
@@ -248,10 +239,10 @@ class RouteServiceTest {
         @Test
         @DisplayName("無路線時回傳空清單")
         void returnsEmpty_whenNoRoutes() {
-            when(tripService.findTripById(1L)).thenReturn(trip);
-            when(routeRepository.findByTripId(1L)).thenReturn(List.of());
+            when(dailyPlanService.findDailyPlan(1L, 10L)).thenReturn(dailyPlan);
+            when(routeRepository.findByDailyPlanId(10L)).thenReturn(List.of());
 
-            List<RouteResponse> result = routeService.getRoutes(1L);
+            List<RouteResponse> result = routeService.getRoutes(1L, 10L);
 
             assertThat(result).isEmpty();
         }
@@ -264,15 +255,15 @@ class RouteServiceTest {
         @Test
         @DisplayName("存在的路線 ID 回傳對應路線")
         void returnsRoute_whenFound() {
-            Route route = new Route(trip, List.of(101L, 102L),
+            Route route = new Route(dailyPlan, List.of(101L, 102L),
                     TransportationMethod.TAXI, 15, new BigDecimal("129"));
             ReflectionTestUtils.setField(route, "id", 50L);
             route.confirm("[]");
 
-            when(tripService.findTripById(1L)).thenReturn(trip);
-            when(routeRepository.findById(50L)).thenReturn(Optional.of(route));
+            when(dailyPlanService.findDailyPlan(1L, 10L)).thenReturn(dailyPlan);
+            when(routeRepository.findByIdAndDailyPlanId(50L, 10L)).thenReturn(Optional.of(route));
 
-            RouteResponse result = routeService.getRoute(1L, 50L);
+            RouteResponse result = routeService.getRoute(1L, 10L, 50L);
 
             assertThat(result.getTransportationMethod()).isEqualTo(TransportationMethod.TAXI);
         }
@@ -280,28 +271,24 @@ class RouteServiceTest {
         @Test
         @DisplayName("路線 ID 不存在時拋出 ResourceNotFoundException")
         void throwsNotFound_whenRouteMissing() {
-            when(tripService.findTripById(1L)).thenReturn(trip);
-            when(routeRepository.findById(99L)).thenReturn(Optional.empty());
+            when(dailyPlanService.findDailyPlan(1L, 10L)).thenReturn(dailyPlan);
+            when(routeRepository.findByIdAndDailyPlanId(99L, 10L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> routeService.getRoute(1L, 99L))
+            assertThatThrownBy(() -> routeService.getRoute(1L, 10L, 99L))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 
         @Test
-        @DisplayName("路線不屬於指定行程時拋出 ResourceNotFoundException")
-        void throwsNotFound_whenRouteBelongsToDifferentTrip() {
-            Trip otherTrip = new Trip("大阪之旅", "大阪",
-                    LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), 1);
-            ReflectionTestUtils.setField(otherTrip, "id", 2L);
+        @DisplayName("路線不屬於指定每日行程時拋出 ResourceNotFoundException")
+        void throwsNotFound_whenRouteBelongsToDifferentDailyPlan() {
+            DailyPlan otherDailyPlan = new DailyPlan(trip, LocalDate.of(2026, 7, 2), 2);
+            ReflectionTestUtils.setField(otherDailyPlan, "id", 20L);
 
-            Route route = new Route(otherTrip, List.of(101L, 102L),
-                    TransportationMethod.WALKING, 20, BigDecimal.ZERO);
-            ReflectionTestUtils.setField(route, "id", 50L);
+            when(dailyPlanService.findDailyPlan(1L, 10L)).thenReturn(dailyPlan);
+            // findByIdAndDailyPlanId with dailyPlanId=10 returns empty (route belongs to plan 20)
+            when(routeRepository.findByIdAndDailyPlanId(50L, 10L)).thenReturn(Optional.empty());
 
-            when(tripService.findTripById(1L)).thenReturn(trip);
-            when(routeRepository.findById(50L)).thenReturn(Optional.of(route));
-
-            assertThatThrownBy(() -> routeService.getRoute(1L, 50L))
+            assertThatThrownBy(() -> routeService.getRoute(1L, 10L, 50L))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }

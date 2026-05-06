@@ -9,8 +9,8 @@ import com.travel.planner.dto.response.RouteSegmentResponse;
 import com.travel.planner.exception.InvalidInputException;
 import com.travel.planner.exception.ResourceNotFoundException;
 import com.travel.planner.model.Attraction;
+import com.travel.planner.model.DailyPlan;
 import com.travel.planner.model.Route;
-import com.travel.planner.model.Trip;
 import com.travel.planner.model.enums.TransportationMethod;
 import com.travel.planner.repository.AttractionRepository;
 import com.travel.planner.repository.RouteRepository;
@@ -33,26 +33,26 @@ public class RouteService {
 
     private final RouteRepository routeRepository;
     private final AttractionRepository attractionRepository;
-    private final TripService tripService;
+    private final DailyPlanService dailyPlanService;
     private final OrsService orsService;
     private final ObjectMapper objectMapper;
 
     public RouteService(RouteRepository routeRepository,
                         AttractionRepository attractionRepository,
-                        TripService tripService,
+                        DailyPlanService dailyPlanService,
                         OrsService orsService,
                         ObjectMapper objectMapper) {
         this.routeRepository = routeRepository;
         this.attractionRepository = attractionRepository;
-        this.tripService = tripService;
+        this.dailyPlanService = dailyPlanService;
         this.orsService = orsService;
         this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
-    public RouteEstimateResponse estimateRoute(Long tripId, PlanRouteRequest request) {
-        tripService.findTripById(tripId);
-        List<Attraction> attractions = resolveAttractions(tripId, request.getAttractionIds());
+    public RouteEstimateResponse estimateRoute(Long tripId, Long dailyPlanId, PlanRouteRequest request) {
+        dailyPlanService.findDailyPlan(tripId, dailyPlanId);
+        List<Attraction> attractions = resolveAttractions(dailyPlanId, request.getAttractionIds());
         List<double[]> coordinates = extractCoordinates(attractions);
         TransportationMethod method = request.getTransportationMethod();
 
@@ -62,7 +62,6 @@ public class RouteService {
         List<RouteSegmentResponse> segments = buildSegments(attractions, orsResult, method);
 
         int totalMinutes = (int) Math.round(orsResult.durationSeconds() / 60.0);
-        // 總費用從各段加總，確保使用 API 回傳的實際票價（transit）
         BigDecimal totalCost = segments.stream()
                 .map(RouteSegmentResponse::getEstimatedCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -78,9 +77,9 @@ public class RouteService {
     }
 
     @Transactional
-    public RouteResponse confirmRoute(Long tripId, PlanRouteRequest request) {
-        Trip trip = tripService.findTripById(tripId);
-        List<Attraction> attractions = resolveAttractions(tripId, request.getAttractionIds());
+    public RouteResponse confirmRoute(Long tripId, Long dailyPlanId, PlanRouteRequest request) {
+        DailyPlan dailyPlan = dailyPlanService.findDailyPlan(tripId, dailyPlanId);
+        List<Attraction> attractions = resolveAttractions(dailyPlanId, request.getAttractionIds());
         List<double[]> coordinates = extractCoordinates(attractions);
         TransportationMethod method = request.getTransportationMethod();
 
@@ -93,7 +92,7 @@ public class RouteService {
                 .map(RouteSegmentResponse::getEstimatedCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        Route route = new Route(trip, request.getAttractionIds(), method, totalMinutes, totalCost);
+        Route route = new Route(dailyPlan, request.getAttractionIds(), method, totalMinutes, totalCost);
         route.confirm(serializeGeometry(orsResult.geometry()));
 
         Route saved = routeRepository.save(route);
@@ -101,34 +100,33 @@ public class RouteService {
     }
 
     @Transactional(readOnly = true)
-    public List<RouteResponse> getRoutes(Long tripId) {
-        tripService.findTripById(tripId);
-        return routeRepository.findByTripId(tripId).stream()
+    public List<RouteResponse> getRoutes(Long tripId, Long dailyPlanId) {
+        dailyPlanService.findDailyPlan(tripId, dailyPlanId);
+        return routeRepository.findByDailyPlanId(dailyPlanId).stream()
                 .map(r -> new RouteResponse(r, deserializeGeometry(r.getGeometryJson())))
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public RouteResponse getRoute(Long tripId, Long routeId) {
-        tripService.findTripById(tripId);
-        Route route = routeRepository.findById(routeId)
-                .filter(r -> r.getTrip().getId().equals(tripId))
+    public RouteResponse getRoute(Long tripId, Long dailyPlanId, Long routeId) {
+        dailyPlanService.findDailyPlan(tripId, dailyPlanId);
+        Route route = routeRepository.findByIdAndDailyPlanId(routeId, dailyPlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到路線 ID: " + routeId));
         return new RouteResponse(route, deserializeGeometry(route.getGeometryJson()));
     }
 
     // ── 私有輔助方法 ──────────────────────────────────────────────
 
-    private List<Attraction> resolveAttractions(Long tripId, List<Long> attractionIds) {
-        List<Attraction> allTripAttractions = attractionRepository.findByTripIdOrderByDateAndTime(tripId);
-        Map<Long, Attraction> attractionMap = allTripAttractions.stream()
+    private List<Attraction> resolveAttractions(Long dailyPlanId, List<Long> attractionIds) {
+        List<Attraction> dayAttractions = attractionRepository.findByDailyPlanIdOrderByStartTimeAsc(dailyPlanId);
+        Map<Long, Attraction> attractionMap = dayAttractions.stream()
                 .collect(Collectors.toMap(Attraction::getId, a -> a));
 
         List<Attraction> result = new ArrayList<>();
         for (Long id : attractionIds) {
             Attraction attraction = attractionMap.get(id);
             if (attraction == null) {
-                throw new InvalidInputException("景點 ID " + id + " 不屬於此行程或不存在");
+                throw new InvalidInputException("景點 ID " + id + " 不屬於此每日行程或不存在");
             }
             result.add(attraction);
         }
@@ -164,7 +162,6 @@ public class RouteService {
             BigDecimal cost;
             if (legData != null && !legData.isEmpty() && i < legData.size()) {
                 minutes = (int) Math.round(legData.get(i)[1] / 60.0);
-                // 優先使用 Google API 回傳的實際票價（transit 才有），否則自行估算
                 List<Double> legFares = orsResult.legFares();
                 if (legFares != null && i < legFares.size() && legFares.get(i) != null) {
                     cost = BigDecimal.valueOf(Math.round(legFares.get(i)));
@@ -176,7 +173,6 @@ public class RouteService {
                 cost = Route.calculateCost(method, orsResult.distanceMeters())
                         .divide(BigDecimal.valueOf(segmentCount), 0, RoundingMode.CEILING);
             }
-            // transit steps（捷運/公車換乘步驟）
             List<com.travel.planner.dto.response.TransitStepInfo> steps = null;
             if (orsResult.segmentSteps() != null && i < orsResult.segmentSteps().size()) {
                 steps = orsResult.segmentSteps().get(i);

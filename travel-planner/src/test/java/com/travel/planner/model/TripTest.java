@@ -73,11 +73,7 @@ class TripTest {
             assertThat(trip.getDailyPlans()).isNotNull().isEmpty();
         }
 
-        @Test
-        @DisplayName("routes 初始為空 list")
-        void routesInitiallyEmpty() {
-            assertThat(trip.getRoutes()).isNotNull().isEmpty();
-        }
+
     }
 
     @Nested
