@@ -21,6 +21,15 @@ function allAttractions(dailyPlans: DailyPlanResponse[]): (AttractionResponse & 
   return dailyPlans.flatMap(p => p.attractions.map(a => ({ ...a, date: p.date })))
 }
 
+function getDailyPlanIdForAttractions(dailyPlans: DailyPlanResponse[], attractionIds: number[]): number | null {
+  for (const plan of dailyPlans) {
+    if (plan.attractions.some(a => attractionIds.includes(a.id))) {
+      return plan.id
+    }
+  }
+  return null
+}
+
 export default function RoutePlanner({ tripId, dailyPlans }: Props) {
   const attractions = allAttractions(dailyPlans)
 
@@ -39,10 +48,12 @@ export default function RoutePlanner({ tripId, dailyPlans }: Props) {
 
   const handleEstimate = async () => {
     if (selected.length < 2) { setError('請至少選擇兩個景點'); return }
+    const dailyPlanId = getDailyPlanIdForAttractions(dailyPlans, selected)
+    if (!dailyPlanId) { setError('找不到景點對應的每日行程'); return }
     setError('')
     setEstimating(true)
     try {
-      const result = await routesApi.estimate(tripId, { attractionIds: selected, transportationMethod: method })
+      const result = await routesApi.estimate(tripId, dailyPlanId, { attractionIds: selected, transportationMethod: method })
       setEstimate(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : '估算失敗')
@@ -53,10 +64,12 @@ export default function RoutePlanner({ tripId, dailyPlans }: Props) {
 
   const handleConfirm = async () => {
     if (!estimate) return
+    const dailyPlanId = getDailyPlanIdForAttractions(dailyPlans, selected)
+    if (!dailyPlanId) { setError('找不到景點對應的每日行程'); return }
     setConfirming(true)
     setError('')
     try {
-      const route = await routesApi.confirm(tripId, { attractionIds: selected, transportationMethod: method })
+      const route = await routesApi.confirm(tripId, dailyPlanId, { attractionIds: selected, transportationMethod: method })
       setConfirmed(prev => [...prev, route])
       setEstimate(null)
       setSelected([])

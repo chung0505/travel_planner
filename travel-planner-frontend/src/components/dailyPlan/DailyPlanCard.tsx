@@ -86,7 +86,7 @@ function DayRoutePanel({
       setLoading(true)
       setError(null)
       try {
-        const routes = await routesApi.getAll(tripId)
+        const routes = await routesApi.getAll(tripId, plan.id)
         const dayAttractionIds = new Set(plan.attractions.map(a => a.id))
         const attractionOrder = new Map(plan.attractions.map((a, i) => [a.id, i]))
 
@@ -112,7 +112,7 @@ function DayRoutePanel({
         // 並行取得所有路線的完整估算（含 segments）
         const ests = await Promise.all(
           matched.map(r =>
-            routesApi.estimate(tripId, {
+            routesApi.estimate(tripId, plan.id, {
               attractionIds: r.attractionIds,
               transportationMethod: r.transportationMethod,
             }),
