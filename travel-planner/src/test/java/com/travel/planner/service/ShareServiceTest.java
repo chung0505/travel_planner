@@ -78,7 +78,7 @@ class ShareServiceTest {
             ShareLinkResponse response = shareService.shareItinerary(1L, request);
 
             assertThat(response.getToken()).isNotBlank();
-            assertThat(response.getUrl()).startsWith("http://localhost:8080/api/share/");
+            assertThat(response.getUrl()).startsWith("http://localhost:8080/share/");
             assertThat(response.getUrl()).contains(response.getToken());
             assertThat(response.getShareType()).isEqualTo(ShareType.LINK);
             assertThat(response.getTripId()).isEqualTo(1L);

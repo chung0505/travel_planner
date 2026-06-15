@@ -4,7 +4,9 @@ import com.travel.planner.dto.request.CreateTripRequest;
 import com.travel.planner.dto.response.TripResponse;
 import com.travel.planner.exception.InvalidInputException;
 import com.travel.planner.exception.ResourceNotFoundException;
+import com.travel.planner.model.Traveler;
 import com.travel.planner.model.Trip;
+import com.travel.planner.repository.TravelerRepository;
 import com.travel.planner.repository.TripRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,10 +34,16 @@ class TripServiceTest {
     @Mock
     private TripRepository tripRepository;
 
+    @Mock
+    private TravelerRepository travelerRepository;
+
     @InjectMocks
     private TripService tripService;
 
+    private static final Long ORGANIZER_ID = 1L;
+
     private CreateTripRequest validRequest;
+    private Traveler organizer;
 
     @BeforeEach
     void setUp() {
@@ -45,6 +53,8 @@ class TripServiceTest {
         validRequest.setDepartureDate(LocalDate.of(2026, 7, 1));
         validRequest.setReturnDate(LocalDate.of(2026, 7, 5));
         validRequest.setCompanionCount(2);
+
+        organizer = new Traveler("主辦人", "organizer@example.com", "hash");
     }
 
     @Nested
@@ -54,9 +64,10 @@ class TripServiceTest {
         @Test
         @DisplayName("成功建立行程並自動產生每日行程")
         void createsTrip_withGeneratedDailyPlans() {
+            when(travelerRepository.findById(ORGANIZER_ID)).thenReturn(Optional.of(organizer));
             when(tripRepository.save(any(Trip.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            TripResponse response = tripService.createTrip(validRequest);
+            TripResponse response = tripService.createTrip(validRequest, ORGANIZER_ID);
 
             assertThat(response.getTitle()).isEqualTo("東京之旅");
             assertThat(response.getDestination()).isEqualTo("東京");
@@ -67,9 +78,10 @@ class TripServiceTest {
         @Test
         @DisplayName("每日行程依日期順序排列且 dayNumber 從 1 開始遞增")
         void dailyPlans_haveCorrectDayNumbersAndDates() {
+            when(travelerRepository.findById(ORGANIZER_ID)).thenReturn(Optional.of(organizer));
             when(tripRepository.save(any(Trip.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            TripResponse response = tripService.createTrip(validRequest);
+            TripResponse response = tripService.createTrip(validRequest, ORGANIZER_ID);
 
             assertThat(response.getDailyPlans().get(0).getDayNumber()).isEqualTo(1);
             assertThat(response.getDailyPlans().get(0).getDate()).isEqualTo(LocalDate.of(2026, 7, 1));
@@ -82,9 +94,10 @@ class TripServiceTest {
         void createsTwoDailyPlans_forTwoDayTrip() {
             validRequest.setDepartureDate(LocalDate.of(2026, 7, 1));
             validRequest.setReturnDate(LocalDate.of(2026, 7, 2));
+            when(travelerRepository.findById(ORGANIZER_ID)).thenReturn(Optional.of(organizer));
             when(tripRepository.save(any(Trip.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            TripResponse response = tripService.createTrip(validRequest);
+            TripResponse response = tripService.createTrip(validRequest, ORGANIZER_ID);
 
             assertThat(response.getDailyPlans()).hasSize(2);
         }
@@ -94,7 +107,7 @@ class TripServiceTest {
         void throwsInvalidInput_whenReturnSameAsDeparture() {
             validRequest.setReturnDate(LocalDate.of(2026, 7, 1));
 
-            assertThatThrownBy(() -> tripService.createTrip(validRequest))
+            assertThatThrownBy(() -> tripService.createTrip(validRequest, ORGANIZER_ID))
                     .isInstanceOf(InvalidInputException.class);
         }
 
@@ -103,7 +116,7 @@ class TripServiceTest {
         void throwsInvalidInput_whenReturnBeforeDeparture() {
             validRequest.setReturnDate(LocalDate.of(2026, 6, 30));
 
-            assertThatThrownBy(() -> tripService.createTrip(validRequest))
+            assertThatThrownBy(() -> tripService.createTrip(validRequest, ORGANIZER_ID))
                     .isInstanceOf(InvalidInputException.class);
         }
     }
@@ -140,15 +153,16 @@ class TripServiceTest {
     class GetAllTrips {
 
         @Test
-        @DisplayName("回傳所有行程清單")
+        @DisplayName("回傳自己建立與參與的行程清單")
         void returnsAllTrips() {
-            List<Trip> trips = List.of(
-                    new Trip("東京之旅", "東京", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 5), 2),
+            when(tripRepository.findByOrganizerId(ORGANIZER_ID)).thenReturn(List.of(
+                    new Trip("東京之旅", "東京", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 5), 2)
+            ));
+            when(tripRepository.findByParticipantsId(ORGANIZER_ID)).thenReturn(List.of(
                     new Trip("大阪之旅", "大阪", LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), 1)
-            );
-            when(tripRepository.findAll()).thenReturn(trips);
+            ));
 
-            List<TripResponse> responses = tripService.getAllTrips();
+            List<TripResponse> responses = tripService.getAllTrips(ORGANIZER_ID);
 
             assertThat(responses).hasSize(2);
             assertThat(responses.get(0).getDestination()).isEqualTo("東京");
@@ -158,9 +172,10 @@ class TripServiceTest {
         @Test
         @DisplayName("無行程時回傳空清單")
         void returnsEmptyList_whenNoTrips() {
-            when(tripRepository.findAll()).thenReturn(List.of());
+            when(tripRepository.findByOrganizerId(ORGANIZER_ID)).thenReturn(List.of());
+            when(tripRepository.findByParticipantsId(ORGANIZER_ID)).thenReturn(List.of());
 
-            List<TripResponse> responses = tripService.getAllTrips();
+            List<TripResponse> responses = tripService.getAllTrips(ORGANIZER_ID);
 
             assertThat(responses).isEmpty();
         }

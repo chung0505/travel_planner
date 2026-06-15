@@ -42,6 +42,8 @@ class BudgetServiceTest {
     @InjectMocks
     private BudgetService budgetService;
 
+    private static final Long VIEWER_ID = 1L;
+
     private Trip trip;
 
     @BeforeEach
@@ -132,7 +134,7 @@ class BudgetServiceTest {
             when(tripService.findTripById(1L)).thenReturn(trip);
             when(budgetRepository.findByTripId(1L)).thenReturn(Optional.of(budget));
 
-            BudgetSummaryResponse response = budgetService.getBudget(1L);
+            BudgetSummaryResponse response = budgetService.getBudget(1L, VIEWER_ID);
 
             assertThat(response.getTotalBudget()).isEqualByComparingTo("50000");
             assertThat(response.getCurrency()).isEqualTo("TWD");
@@ -146,7 +148,7 @@ class BudgetServiceTest {
             when(tripService.findTripById(1L)).thenReturn(trip);
             when(budgetRepository.findByTripId(1L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> budgetService.getBudget(1L))
+            assertThatThrownBy(() -> budgetService.getBudget(1L, VIEWER_ID))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 
@@ -156,7 +158,7 @@ class BudgetServiceTest {
             when(tripService.findTripById(99L))
                     .thenThrow(new ResourceNotFoundException("找不到行程 ID: 99"));
 
-            assertThatThrownBy(() -> budgetService.getBudget(99L))
+            assertThatThrownBy(() -> budgetService.getBudget(99L, VIEWER_ID))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }
@@ -191,7 +193,7 @@ class BudgetServiceTest {
             when(budgetRepository.save(any(Budget.class))).thenAnswer(inv -> inv.getArgument(0));
 
             BudgetSummaryResponse response = budgetService.addExpense(1L,
-                    buildRequest("3000", ExpenseType.ACCOMMODATION));
+                    buildRequest("3000", ExpenseType.ACCOMMODATION), VIEWER_ID);
 
             assertThat(response.getTotalSpent()).isEqualByComparingTo("3000");
             assertThat(response.getRemainingBudget()).isEqualByComparingTo("47000");
@@ -220,7 +222,7 @@ class BudgetServiceTest {
             when(travelerRepository.findAllById(List.of(101L, 102L))).thenReturn(List.of(t1, t2));
             when(budgetRepository.save(any(Budget.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            BudgetSummaryResponse response = budgetService.addExpense(1L, req);
+            BudgetSummaryResponse response = budgetService.addExpense(1L, req, VIEWER_ID);
 
             assertThat(response.getExpenses().get(0).getSharings()).hasSize(2);
             assertThat(response.getExpenses().get(0).getSharings().get(0).getAmountPerPerson())
@@ -244,7 +246,7 @@ class BudgetServiceTest {
             when(travelerRepository.findById(101L)).thenReturn(Optional.of(payer));
             when(budgetRepository.save(any(Budget.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            BudgetSummaryResponse response = budgetService.addExpense(1L, req);
+            BudgetSummaryResponse response = budgetService.addExpense(1L, req, VIEWER_ID);
 
             assertThat(response.getExpenses().get(0).getPaidByTravelerId()).isEqualTo(101L);
         }
@@ -262,7 +264,7 @@ class BudgetServiceTest {
             when(budgetRepository.findByTripId(1L)).thenReturn(Optional.of(budget));
             when(travelerRepository.findById(999L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> budgetService.addExpense(1L, req))
+            assertThatThrownBy(() -> budgetService.addExpense(1L, req, VIEWER_ID))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 
@@ -277,7 +279,7 @@ class BudgetServiceTest {
             when(budgetRepository.save(any(Budget.class))).thenAnswer(inv -> inv.getArgument(0));
 
             BudgetSummaryResponse response = budgetService.addExpense(1L,
-                    buildRequest("5000", ExpenseType.TICKET));
+                    buildRequest("5000", ExpenseType.TICKET), VIEWER_ID);
 
             assertThat(response.isOverBudget()).isTrue();
             assertThat(response.getRemainingBudget()).isEqualByComparingTo("-4000");
@@ -299,7 +301,7 @@ class BudgetServiceTest {
             when(budgetRepository.findByTripId(1L)).thenReturn(Optional.of(budget));
             when(travelerRepository.findAllById(List.of(101L, 999L))).thenReturn(List.of(t1));
 
-            assertThatThrownBy(() -> budgetService.addExpense(1L, req))
+            assertThatThrownBy(() -> budgetService.addExpense(1L, req, VIEWER_ID))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 
@@ -309,7 +311,7 @@ class BudgetServiceTest {
             when(tripService.findTripById(1L)).thenReturn(trip);
             when(budgetRepository.findByTripId(1L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> budgetService.addExpense(1L, buildRequest("3000", ExpenseType.FOOD)))
+            assertThatThrownBy(() -> budgetService.addExpense(1L, buildRequest("3000", ExpenseType.FOOD), VIEWER_ID))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }
