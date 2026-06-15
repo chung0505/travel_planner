@@ -30,6 +30,18 @@ public class Trip {
     @Column(nullable = false)
     private int companionCount;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organizer_id")
+    private Traveler organizer;
+
+    @ManyToMany
+    @JoinTable(
+        name = "trip_participants",
+        joinColumns = @JoinColumn(name = "trip_id"),
+        inverseJoinColumns = @JoinColumn(name = "traveler_id")
+    )
+    private List<Traveler> participants = new ArrayList<>();
+
     @OneToMany(mappedBy = "trip", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("date ASC")
     private List<DailyPlan> dailyPlans = new ArrayList<>();
@@ -50,6 +62,8 @@ public class Trip {
     public LocalDate getDepartureDate() { return departureDate; }
     public LocalDate getReturnDate() { return returnDate; }
     public int getCompanionCount() { return companionCount; }
+    public Traveler getOrganizer() { return organizer; }
+    public List<Traveler> getParticipants() { return participants; }
     public List<DailyPlan> getDailyPlans() { return dailyPlans; }
 
     public void setTitle(String title) { this.title = title; }
@@ -57,23 +71,20 @@ public class Trip {
     public void setDepartureDate(LocalDate departureDate) { this.departureDate = departureDate; }
     public void setReturnDate(LocalDate returnDate) { this.returnDate = returnDate; }
     public void setCompanionCount(int companionCount) { this.companionCount = companionCount; }
+    public void setOrganizer(Traveler organizer) { this.organizer = organizer; }
 
-    // ── Domain behaviour ────────────────────────────────────────────────────
+    public void addParticipant(Traveler traveler) {
+        if (!participants.contains(traveler)) {
+            participants.add(traveler);
+        }
+    }
 
-    /**
-     * 驗證出發日期與回程日期的合法性。
-     * 回程日期必須晚於出發日期，否則拋出 InvalidInputException。
-     */
     public static void validateDates(LocalDate departureDate, LocalDate returnDate) {
         if (!returnDate.isAfter(departureDate)) {
             throw new InvalidInputException("回程日期必須晚於出發日期");
         }
     }
 
-    /**
-     * 根據出發日期與回程日期，自動產生每日行程（DailyPlan）並加入此行程。
-     * 每天一筆，從出發日到回程日（含）。
-     */
     public void generateDailyPlans() {
         LocalDate current = this.departureDate;
         int dayNumber = 1;

@@ -7,6 +7,7 @@ import com.travel.planner.service.TripService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,8 +23,11 @@ public class TripController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<TripResponse>> createTrip(@Valid @RequestBody CreateTripRequest request) {
-        TripResponse response = tripService.createTrip(request);
+    public ResponseEntity<ApiResponse<TripResponse>> createTrip(
+            @Valid @RequestBody CreateTripRequest request,
+            Authentication auth) {
+        Long organizerId = (Long) auth.getPrincipal();
+        TripResponse response = tripService.createTrip(request, organizerId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("行程建立成功", response));
     }
@@ -35,8 +39,9 @@ public class TripController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<TripResponse>>> getAllTrips() {
-        List<TripResponse> responses = tripService.getAllTrips();
+    public ResponseEntity<ApiResponse<List<TripResponse>>> getAllTrips(Authentication auth) {
+        Long organizerId = (Long) auth.getPrincipal();
+        List<TripResponse> responses = tripService.getAllTrips(organizerId);
         return ResponseEntity.ok(ApiResponse.success(responses));
     }
 
@@ -44,5 +49,21 @@ public class TripController {
     public ResponseEntity<ApiResponse<Void>> deleteTrip(@PathVariable Long tripId) {
         tripService.deleteTrip(tripId);
         return ResponseEntity.ok(ApiResponse.success("行程已刪除", null));
+    }
+
+    @PostMapping("/{tripId}/participants/{travelerId}")
+    public ResponseEntity<ApiResponse<TripResponse>> addParticipant(
+            @PathVariable Long tripId,
+            @PathVariable Long travelerId) {
+        TripResponse response = tripService.addParticipant(tripId, travelerId);
+        return ResponseEntity.ok(ApiResponse.success("已新增旅伴", response));
+    }
+
+    @DeleteMapping("/{tripId}/participants/{travelerId}")
+    public ResponseEntity<ApiResponse<TripResponse>> removeParticipant(
+            @PathVariable Long tripId,
+            @PathVariable Long travelerId) {
+        TripResponse response = tripService.removeParticipant(tripId, travelerId);
+        return ResponseEntity.ok(ApiResponse.success("已移除旅伴", response));
     }
 }

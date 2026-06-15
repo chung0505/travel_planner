@@ -15,6 +15,8 @@ public class TripResponse {
     private final int companionCount;
     private final int totalDays;
     private final List<DailyPlanResponse> dailyPlans;
+    private final TravelerResponse organizer;
+    private final List<TravelerResponse> participants;
 
     public TripResponse(Trip trip) {
         this.id = trip.getId();
@@ -27,6 +29,10 @@ public class TripResponse {
         this.dailyPlans = trip.getDailyPlans().stream()
                 .map(DailyPlanResponse::new)
                 .toList();
+        this.organizer = trip.getOrganizer() != null ? new TravelerResponse(trip.getOrganizer()) : null;
+        this.participants = trip.getParticipants().stream()
+                .map(TravelerResponse::new)
+                .toList();
     }
 
     public Long getId() { return id; }
@@ -37,4 +43,6 @@ public class TripResponse {
     public int getCompanionCount() { return companionCount; }
     public int getTotalDays() { return totalDays; }
     public List<DailyPlanResponse> getDailyPlans() { return dailyPlans; }
+    public TravelerResponse getOrganizer() { return organizer; }
+    public List<TravelerResponse> getParticipants() { return participants; }
 }
