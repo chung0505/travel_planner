@@ -2,10 +2,21 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import DailyPlanCard from '../components/dailyPlan/DailyPlanCard'
 import RoutePlanner from '../components/route/RoutePlanner'
+import BudgetPanel from '../components/budget/BudgetPanel'
+import SharePanel from '../components/share/SharePanel'
+import ParticipantsPanel from '../components/trip/ParticipantsPanel'
 import { tripsApi } from '../api/trips'
 import type { DailyPlanResponse, TripResponse } from '../types'
 
-type Tab = 'plans' | 'route'
+type Tab = 'plans' | 'route' | 'budget' | 'share' | 'members'
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'plans',   label: '每日行程' },
+  { key: 'route',   label: '路線規劃' },
+  { key: 'budget',  label: '預算管理' },
+  { key: 'share',   label: '行程分享' },
+  { key: 'members', label: '旅程成員' },
+]
 
 export default function TripDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -27,8 +38,16 @@ export default function TripDetailPage() {
       .finally(() => setLoading(false))
   }, [tripId, navigate])
 
+  const handleTripUpdated = (updated: TripResponse) => {
+    setTrip(updated)
+  }
+
   const handlePlanUpdated = (updated: DailyPlanResponse) => {
     setDailyPlans(prev => prev.map(p => p.id === updated.id ? updated : p))
+    setTrip(prev => prev ? {
+      ...prev,
+      dailyPlans: prev.dailyPlans.map(p => p.id === updated.id ? updated : p),
+    } : prev)
   }
 
   if (loading) {
@@ -75,10 +94,7 @@ export default function TripDetailPage() {
         {/* Tabs */}
         <div className="max-w-3xl mx-auto px-4">
           <div className="flex gap-1">
-            {([
-              { key: 'plans', label: '每日行程' },
-              { key: 'route', label: '路線規劃' },
-            ] as { key: Tab; label: string }[]).map(tab => (
+            {TABS.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
@@ -115,6 +131,24 @@ export default function TripDetailPage() {
             </p>
             <RoutePlanner tripId={tripId} dailyPlans={dailyPlans} />
           </div>
+        )}
+
+        {activeTab === 'budget' && (
+          <BudgetPanel
+            tripId={tripId}
+            participants={[
+              ...(trip.organizer ? [trip.organizer] : []),
+              ...trip.participants.filter(p => p.id !== trip.organizer?.id),
+            ]}
+          />
+        )}
+
+        {activeTab === 'share' && (
+          <SharePanel tripId={tripId} trip={trip} />
+        )}
+
+        {activeTab === 'members' && (
+          <ParticipantsPanel trip={trip} onUpdated={handleTripUpdated} />
         )}
       </main>
     </div>

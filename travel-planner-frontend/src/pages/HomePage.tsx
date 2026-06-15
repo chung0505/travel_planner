@@ -1,14 +1,23 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Button from '../components/common/Button'
 import TripCard from '../components/trip/TripCard'
 import CreateTripModal from '../components/trip/CreateTripModal'
 import { tripsApi } from '../api/trips'
+import { useAuth } from '../context/AuthContext'
 import type { TripResponse } from '../types'
 
 export default function HomePage() {
+  const { traveler, logout } = useAuth()
+  const navigate = useNavigate()
   const [trips, setTrips] = useState<TripResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
 
   useEffect(() => {
     tripsApi.getAll()
@@ -25,7 +34,16 @@ export default function HomePage() {
             <h1 className="text-xl font-bold text-gray-800">✈️ 旅遊行程規劃系統</h1>
             <p className="text-xs text-gray-400 mt-0.5">整合行程安排、景點管理與路線規劃</p>
           </div>
-          <Button onClick={() => setShowCreate(true)}>+ 建立新行程</Button>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">👤 {traveler?.name}</span>
+            <Button onClick={() => setShowCreate(true)}>+ 建立新行程</Button>
+            <button
+              onClick={handleLogout}
+              className="text-sm text-gray-400 hover:text-red-500 transition-colors"
+            >
+              登出
+            </button>
+          </div>
         </div>
       </header>
 
